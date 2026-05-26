@@ -6,6 +6,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from pydantic import BaseModel
 from sqlmodel import Session
+from core.auth import get_current_user, CurrentUser
 
 from core.database import get_session
 from models.tables import DocumentStatus
@@ -65,6 +66,7 @@ def validate_upload(file: UploadFile, file_bytes: bytes) -> None:
 async def upload_document(
     file: UploadFile = File(...),
     user_id: uuid.UUID | None = Form(default=None),
+    current_user: CurrentUser = Depends(get_current_user),
     session: Session = Depends(get_session),
 ) -> UploadResponse:
     file_bytes = await file.read()
@@ -92,6 +94,7 @@ async def upload_document(
             file_url=file_url,
             file_size_bytes=len(file_bytes),
             user_id=user_id,
+            clerk_user_id=current_user.clerk_user_id,
         )
     except Exception as exc:
         try:

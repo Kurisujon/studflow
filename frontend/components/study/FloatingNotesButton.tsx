@@ -15,7 +15,11 @@ export function FloatingNotesButton({
 }) {
   return (
     <Button
-      onClick={onClick}
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onClick();
+      }}
       data-study-bubble-head="true"
       style={{
         position: "fixed",
@@ -32,6 +36,7 @@ export function FloatingNotesButton({
         background:
           "linear-gradient(180deg, rgba(255,255,255,0.98), rgba(255,247,237,0.96))",
         border: "1px solid rgba(249,115,22,0.14)",
+        color: "#2f1c0f",
       }}
       aria-label="Open study tools"
       title="Open study tools"

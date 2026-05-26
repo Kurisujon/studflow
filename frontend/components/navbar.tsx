@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { UserButton, useUser } from "@clerk/nextjs";
 
 const NAV_LINKS = [
   { label: "Dashboard", href: "/dashboard" },
@@ -10,6 +11,7 @@ const NAV_LINKS = [
 
 export function Navbar() {
   const pathname = usePathname();
+  const { isLoaded, isSignedIn } = useUser();
 
   return (
     <header
@@ -46,7 +48,7 @@ export function Navbar() {
             color: "var(--distill-text-primary)",
           }}
         >
-          Distill
+          Studflow
         </Link>
 
         {/* Nav links */}
@@ -55,40 +57,61 @@ export function Navbar() {
           aria-label="Main navigation"
           style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}
         >
-          {NAV_LINKS.map(({ label, href }) => {
-            const isActive = pathname === href;
-            return (
-              <Link
-                key={href}
-                href={href}
-                style={{
-                  padding: "0.375rem 0.875rem",
-                  borderRadius: "6px",
-                  fontSize: "0.875rem",
-                  fontWeight: 500,
-                  color: isActive
-                    ? "var(--distill-text-primary)"
-                    : "var(--distill-text-secondary)",
-                  backgroundColor: isActive ? "var(--distill-border)" : "transparent",
-                  transition: "color var(--transition-fast), background-color var(--transition-fast)",
-                }}
-              >
-                {label}
-              </Link>
-            );
-          })}
+          {isLoaded && isSignedIn ? (
+            <>
+            {NAV_LINKS.map(({ label, href }) => {
+              const isActive = pathname === href;
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  style={{
+                    padding: "0.375rem 0.875rem",
+                    borderRadius: "6px",
+                    fontSize: "0.875rem",
+                    fontWeight: 500,
+                    color: isActive
+                      ? "var(--distill-text-primary)"
+                      : "var(--distill-text-secondary)",
+                    backgroundColor: isActive ? "var(--distill-border)" : "transparent",
+                    transition: "color var(--transition-fast), background-color var(--transition-fast)",
+                  }}
+                >
+                  {label}
+                </Link>
+              );
+            })}
+            <div style={{ marginLeft: "0.75rem", display: "flex", alignItems: "center" }}>
+              <UserButton />
+            </div>
+            </>
+          ) : null}
 
-          {/* CTA */}
-          <a
-            href="/upload"
-            className="btn-primary"
-            style={{ marginLeft: "0.75rem" }}
-          >
-            Get Started
-          </a>
+          {isLoaded && !isSignedIn ? (
+            <>
+            <Link
+              href="/sign-in"
+              style={{
+                padding: "0.375rem 0.875rem",
+                borderRadius: "6px",
+                fontSize: "0.875rem",
+                fontWeight: 500,
+                color: "var(--distill-text-secondary)",
+              }}
+            >
+              Sign In
+            </Link>
+            <Link
+              href="/sign-up"
+              className="btn-primary"
+              style={{ marginLeft: "0.75rem" }}
+            >
+              Get Started
+            </Link>
+            </>
+          ) : null}
         </nav>
       </div>
     </header>
   );
 }
-

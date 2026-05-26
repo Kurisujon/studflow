@@ -61,6 +61,12 @@ class SelectionExplanation(BaseModel):
     suggested_flashcard: SuggestedFlashcard
 
 
+class YouTubeSearchQuery(BaseModel):
+    main_topic: str
+    search_query: str
+    keywords: list[str]
+
+
 SUMMARY_SYSTEM_PROMPT = """
 You are an expert academic tutor. I am providing you with extracted text from a study document.
 Your task is to create a COMPREHENSIVE, highly detailed study guide.
@@ -266,3 +272,26 @@ def explain_selection(
         response_schema=SelectionExplanation,
     )
     return SelectionExplanation.model_validate_json(response.text)
+
+
+def extract_youtube_search_query(document_text_or_summary: str) -> YouTubeSearchQuery:
+    if not document_text_or_summary:
+        raise AIServiceError("Cannot extract YouTube query without document content.")
+
+    prompt = (
+        "You are an expert educational content curator. Based on the following study document or summary, "
+        "extract the main topic and suggest a short, tutorial-focused YouTube search query. "
+        "Also provide 3-5 educational keywords.\n"
+        "Return only valid JSON that matches the required schema.\n"
+        "Do not return YouTube URLs.\n"
+        "Do not invent video links.\n"
+        "Keep the search_query concise and useful for a student.\n\n"
+        f"Document context:\n{document_text_or_summary}"
+    )
+    
+    response = _generate_structured(
+        prompt=prompt,
+        response_schema=YouTubeSearchQuery,
+    )
+    
+    return YouTubeSearchQuery.model_validate_json(response.text)

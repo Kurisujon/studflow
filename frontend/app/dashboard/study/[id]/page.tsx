@@ -82,6 +82,8 @@ export default async function StudyPage({
                 minHeight: "42px",
                 paddingInline: "18px",
                 borderRadius: "999px",
+                color: tab === item.key ? "#ffffff" : "#2f1c0f",
+                backgroundColor: tab === item.key ? "#111110" : "rgba(255,255,255,0.86)",
               }}
             >
               {item.label}

@@ -1,9 +1,19 @@
 import { API_BASE_URL } from "@/lib/api";
 import type { DocumentListItem, StudyDocument } from "@/lib/types";
+import { auth } from "@clerk/nextjs/server";
 
 async function fetchJSON<T>(path: string): Promise<T> {
+  const { getToken } = await auth();
+  const token = await getToken();
+  
+  const headers: HeadersInit = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
   const response = await fetch(`${API_BASE_URL}${path}`, {
     cache: "no-store",
+    headers,
   });
 
   if (!response.ok) {

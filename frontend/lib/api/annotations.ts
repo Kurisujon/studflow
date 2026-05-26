@@ -1,6 +1,15 @@
 import { API_BASE_URL } from "@/lib/api";
 import type { AIExplanation, Annotation } from "@/types/annotations";
 
+function isAIExplanation(payload: AIExplanation | { detail: string }): payload is AIExplanation {
+  return (
+    "selectedText" in payload &&
+    "simplifiedExplanation" in payload &&
+    "example" in payload &&
+    "relatedTerms" in payload
+  );
+}
+
 export async function askAIAboutSelection(
   selectedText: string,
   question: string,
@@ -20,6 +29,10 @@ export async function askAIAboutSelection(
 
   if (!response.ok) {
     throw new Error("detail" in payload ? payload.detail : "AI explanation failed.");
+  }
+
+  if (!isAIExplanation(payload)) {
+    throw new Error("AI response was missing explanation content.");
   }
 
   return payload;

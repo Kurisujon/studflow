@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+import logging
 
 from sqlmodel import Session, select
 
@@ -12,6 +13,7 @@ from services.ai_service import (
     generate_flashcards,
     generate_quiz,
     generate_summary,
+    extract_youtube_search_query,
 )
 from services.document_processing import (
     DocumentProcessingError,
@@ -24,9 +26,13 @@ from services.documents import (
     save_flashcards,
     save_quiz,
     save_summary,
+    save_related_videos,
     update_document_status,
 )
+from services.youtube_service import search_related_videos
 from services.storage import StorageServiceError, download_file_from_storage
+
+logger = logging.getLogger(__name__)
 
 
 @celery_app.task(name="tasks.process_document_task")
@@ -93,6 +99,19 @@ def process_document_task(document_id: str) -> dict[str, int | str]:
                 document_id=document.id,
                 questions=quiz_questions,
             )
+
+            try:
+                youtube_query = extract_youtube_search_query(summary.overall_overview)
+                videos = search_related_videos(youtube_query.search_query, max_results=3)
+                if videos:
+                    save_related_videos(
+                        session=session,
+                        document_id=document.id,
+                        videos=videos,
+                        relevance_reason=f"Recommended because this document discusses {youtube_query.main_topic}."
+                    )
+            except Exception as exc:
+                logger.warning("Skipping YouTube related videos: %s", exc)
 
             update_document_status(
                 session=session,

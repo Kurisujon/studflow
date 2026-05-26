@@ -3,7 +3,9 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 
+import { AnnotatableTextBlock } from "@/components/study/AnnotatableTextBlock";
 import { FloatingNotesButton } from "@/components/study/FloatingNotesButton";
+import { RelatedLearningVideos } from "@/components/study/RelatedLearningVideos";
 import { StudySidePanel } from "@/components/study/StudySidePanel";
 import { Button } from "@/components/ui/button";
 import { deleteAnnotation, saveAnnotation } from "@/lib/api/annotations";
@@ -15,6 +17,8 @@ import type {
   SelectionState,
   StudyBubbleTab,
   StudyNote,
+  TextSelectionPayload,
+  UnderlineColor,
 } from "@/types/annotations";
 
 type SummaryData = NonNullable<StudyDocument["summary_data"]>;
@@ -29,158 +33,8 @@ const HIGHLIGHT_COLORS: AnnotationColor[] = [
   "purple",
 ];
 
-const COLOR_STYLES: Record<AnnotationColor, { background: string; underline: string }> = {
-  blue: { background: "rgba(96,165,250,0.24)", underline: "#60a5fa" },
-  yellow: { background: "rgba(250,204,21,0.28)", underline: "#facc15" },
-  green: { background: "rgba(52,211,153,0.24)", underline: "#34d399" },
-  pink: { background: "rgba(251,113,133,0.22)", underline: "#fb7185" },
-  purple: { background: "rgba(192,132,252,0.2)", underline: "#a78bfa" },
-};
-
 function storageKey(documentId: string) {
   return `${STORAGE_KEY_PREFIX}:${documentId}`;
-}
-
-function escapeHTML(text: string) {
-  return text
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
-
-function getTextOffset(root: HTMLElement, node: Node, offset: number) {
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-  let currentNode = walker.nextNode();
-  let total = 0;
-
-  while (currentNode) {
-    const length = currentNode.textContent?.length ?? 0;
-    if (currentNode === node) {
-      return total + offset;
-    }
-    total += length;
-    currentNode = walker.nextNode();
-  }
-
-  return total;
-}
-
-function buildSelectionState(root: HTMLElement, selection: Selection): SelectionState | null {
-  if (selection.rangeCount === 0) return null;
-
-  const range = selection.getRangeAt(0);
-  const selectedText = selection.toString().trim();
-  if (!selectedText) return null;
-
-  const blockElement = (range.commonAncestorContainer.nodeType === Node.ELEMENT_NODE
-    ? (range.commonAncestorContainer as Element)
-    : range.commonAncestorContainer.parentElement
-  )?.closest<HTMLElement>("[data-annotatable-block]");
-
-  if (!blockElement || !root.contains(blockElement)) return null;
-
-  const blockId = blockElement.dataset.annotatableBlock;
-  if (!blockId) return null;
-
-  const startOffset = getTextOffset(blockElement, range.startContainer, range.startOffset);
-  const endOffset = getTextOffset(blockElement, range.endContainer, range.endOffset);
-  const rect = range.getBoundingClientRect();
-  const shouldPlaceBelow = rect.top < 80;
-
-  return {
-    blockId,
-    selectedText,
-    startOffset,
-    endOffset,
-    x: rect.left + window.scrollX + rect.width / 2,
-    y: shouldPlaceBelow
-      ? rect.bottom + window.scrollY + 8
-      : rect.top + window.scrollY - 52,
-  };
-}
-
-function annotationRangeKey(annotation: Annotation) {
-  return `${annotation.blockId}:${annotation.startOffset}:${annotation.endOffset}`;
-}
-
-function renderAnnotatedHTML(
-  text: string,
-  annotations: Annotation[],
-  pendingSelection?: { startOffset: number; endOffset: number } | null,
-) {
-  if (annotations.length === 0) {
-    if (!pendingSelection) {
-      return escapeHTML(text);
-    }
-    return (
-      escapeHTML(text.slice(0, pendingSelection.startOffset)) +
-      `<span style="background:rgba(59,130,246,0.22);border-radius:0.25rem;">${escapeHTML(
-        text.slice(pendingSelection.startOffset, pendingSelection.endOffset),
-      )}</span>` +
-      escapeHTML(text.slice(pendingSelection.endOffset))
-    );
-  }
-
-  const grouped = new Map<
-    string,
-    {
-      start: number;
-      end: number;
-      highlight?: Annotation;
-      underline?: Annotation;
-      note?: Annotation;
-    }
-  >();
-
-  for (const annotation of annotations) {
-    const key = annotationRangeKey(annotation);
-    const current = grouped.get(key) ?? {
-      start: annotation.startOffset,
-      end: annotation.endOffset,
-    };
-
-    if (annotation.type === "highlight") current.highlight = annotation;
-    if (annotation.type === "underline") current.underline = annotation;
-    if (annotation.type === "note") current.note = annotation;
-
-    grouped.set(key, current);
-  }
-
-  const ordered = [...grouped.values()].sort((a, b) => a.start - b.start);
-  let cursor = 0;
-  let html = "";
-
-  for (const item of ordered) {
-    if (item.start < cursor || item.end > text.length) continue;
-
-    html += escapeHTML(text.slice(cursor, item.start));
-    const selected = escapeHTML(text.slice(item.start, item.end));
-    const styles: string[] = [];
-
-    if (item.highlight?.color) {
-      styles.push(
-        `background:${COLOR_STYLES[item.highlight.color].background};border-radius:0.3rem;padding:0 0.08rem;`,
-      );
-    }
-
-    if (item.underline?.underlineColor) {
-      const underlineColor =
-        item.underline.underlineColor === "neutral"
-          ? "#525252"
-          : COLOR_STYLES[item.underline.underlineColor].underline;
-      styles.push(
-        `text-decoration-line:underline;text-decoration-color:${underlineColor};text-decoration-thickness:2px;text-underline-offset:3px;`,
-      );
-    }
-
-    html += `<span data-annotation-id="${item.note?.id ?? item.highlight?.id ?? item.underline?.id ?? ""}" style="${styles.join("")}">${selected}${item.note ? `<sup data-note-id="${item.note.id}" style="margin-left:0.22rem;color:#c2410c;font-weight:700;cursor:pointer;">●</sup>` : ""}</span>`;
-    cursor = item.end;
-  }
-
-  html += escapeHTML(text.slice(cursor));
-  return html;
 }
 
 function formatTerm(term: string) {
@@ -190,31 +44,11 @@ function formatTerm(term: string) {
   return { label: label.trim(), definition: rest.join(separator).trim() };
 }
 
-function renderTermHTML(
-  text: string,
-  annotations: Annotation[],
-  pendingSelection?: { startOffset: number; endOffset: number } | null,
-) {
-  const formatted = formatTerm(text);
-  const combined = formatted.definition ? `${formatted.label}: ${formatted.definition}` : formatted.label;
-  const rawHTML = renderAnnotatedHTML(combined, annotations, pendingSelection);
-  const escapedLabel = escapeHTML(formatted.label);
-
-  if (!formatted.definition) {
-    return `<strong style="color:#9a3412;">${rawHTML}</strong>`;
-  }
-
-  return rawHTML.replace(
-    escapedLabel,
-    `<strong style="color:#9a3412;">${escapedLabel}</strong>`,
-  );
-}
-
 function makeAnnotation(
   documentId: string,
   selection: SelectionState,
   type: "highlight" | "underline" | "note",
-  color?: AnnotationColor,
+  color?: AnnotationColor | UnderlineColor,
   noteContent?: string,
 ): Annotation {
   const now = new Date().toISOString();
@@ -226,7 +60,7 @@ function makeAnnotation(
     endOffset: selection.endOffset,
     blockId: selection.blockId,
     type,
-    color,
+    color: type === "highlight" && color !== "neutral" ? color : undefined,
     underlineColor: type === "underline" ? color ?? "blue" : undefined,
     noteContent,
     createdAt: now,
@@ -244,20 +78,33 @@ export function InteractiveSummaryReader({
   const [activeIndex, setActiveIndex] = useState(0);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [notes, setNotes] = useState<StudyNote[]>([]);
-  const [undoStack, setUndoStack] = useState<Annotation[][]>([]);
-  const [redoStack, setRedoStack] = useState<Annotation[][]>([]);
   const [selectionState, setSelectionState] = useState<SelectionState | null>(null);
   const [pendingSelection, setPendingSelection] = useState<SelectionState | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [activeBubbleTab, setActiveBubbleTab] = useState<StudyBubbleTab>("notes");
   const [assistantInitialQuestion, setAssistantInitialQuestion] = useState("");
   const [aiMode, setAiMode] = useState<AIToolMode>("ask-ai");
-  const [activeHighlightColor, setActiveHighlightColor] = useState<AnnotationColor>("blue");
+  const [aiContextText, setAiContextText] = useState("");
+  const [activeHighlightColor] = useState<AnnotationColor>("blue");
   const [underlineColorMode, setUnderlineColorMode] = useState(false);
   const [noteComposerValue, setNoteComposerValue] = useState("");
+  const [noteContextText, setNoteContextText] = useState("");
   const [pulseAnnotationId, setPulseAnnotationId] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const selectionPopoverRef = useRef<HTMLDivElement | null>(null);
+
+  function handleTextSelection(payload: TextSelectionPayload) {
+    const state: SelectionState = {
+      blockId: payload.blockId,
+      selectedText: payload.selectedText,
+      startOffset: payload.startOffset,
+      endOffset: payload.endOffset,
+      x: payload.rect.left + payload.rect.width / 2,
+      y: payload.rect.top,
+    };
+    setSelectionState(state);
+    setPendingSelection(state);
+  }
 
   useEffect(() => {
     try {
@@ -352,6 +199,7 @@ export function InteractiveSummaryReader({
   const topicAnnotations = annotations.filter((annotation) => {
     return (
       annotation.blockId === `overview-${activeIndex}` ||
+      annotation.blockId === `title-${activeIndex}` ||
       annotation.blockId.startsWith(`point-${activeIndex}-`) ||
       annotation.blockId.startsWith(`term-${activeIndex}-`)
     );
@@ -360,8 +208,6 @@ export function InteractiveSummaryReader({
   const topicNotes = notes.filter((note) => note.topicIndex === activeIndex || note.topicIndex === undefined);
 
   function commit(next: Annotation[]) {
-    setUndoStack((current) => [...current, annotations]);
-    setRedoStack([]);
     setAnnotations(next);
   }
 
@@ -407,7 +253,7 @@ export function InteractiveSummaryReader({
     clearPendingSelection();
   }
 
-  function saveUnderline(color: AnnotationColor) {
+  function saveUnderline(color: UnderlineColor) {
     if (!pendingSelection) return;
 
     const existing = annotations.find(
@@ -474,6 +320,7 @@ export function InteractiveSummaryReader({
     }
 
     setNoteComposerValue("");
+    setNoteContextText("");
     clearPendingSelection();
   }
 
@@ -497,47 +344,20 @@ export function InteractiveSummaryReader({
     window.setTimeout(() => setPulseAnnotationId(null), 1200);
   }
 
-  function undo() {
-    if (undoStack.length === 0) return;
-    const previous = undoStack[undoStack.length - 1];
-    setRedoStack((current) => [...current, annotations]);
-    setUndoStack((current) => current.slice(0, -1));
-    setAnnotations(previous);
-  }
-
-  function redo() {
-    if (redoStack.length === 0) return;
-    const next = redoStack[redoStack.length - 1];
-    setUndoStack((current) => [...current, annotations]);
-    setRedoStack((current) => current.slice(0, -1));
-    setAnnotations(next);
-  }
-
-  function handleSelection() {
-    const selection = window.getSelection();
-    if (!selection || selection.isCollapsed || !rootRef.current) return;
-    const state = buildSelectionState(rootRef.current, selection);
-    if (!state) return;
-    setSelectionState(state);
-    setPendingSelection(state);
-  }
-
   function renderPoint(point: string, index: number) {
     const blockId = `point-${activeIndex}-${index}`;
     const blockAnnotations = topicAnnotations.filter((annotation) => annotation.blockId === blockId);
     const pulse = blockAnnotations.some((annotation) => annotation.id === pulseAnnotationId);
     return (
-      <li
+      <AnnotatableTextBlock
         key={`${activeSection.topic_title}-point-${index}`}
-        data-annotatable-block={blockId}
-        dangerouslySetInnerHTML={{
-          __html: renderAnnotatedHTML(
-            point,
-            blockAnnotations,
-            pendingSelectionForBlock(blockId),
-          ),
-        }}
-        style={{ userSelect: "text", animation: pulse ? "notePulse 1s ease-out" : undefined }}
+        as="li"
+        blockId={blockId}
+        text={point}
+        annotations={blockAnnotations}
+        pendingSelection={pendingSelectionForBlock(blockId)}
+        pulse={pulse}
+        onSelection={handleTextSelection}
       />
     );
   }
@@ -546,24 +366,27 @@ export function InteractiveSummaryReader({
     const blockId = `term-${activeIndex}-${index}`;
     const blockAnnotations = topicAnnotations.filter((annotation) => annotation.blockId === blockId);
     const pulse = blockAnnotations.some((annotation) => annotation.id === pulseAnnotationId);
+    const formatted = formatTerm(term);
+    const text = formatted.definition ? `${formatted.label}: ${formatted.definition}` : formatted.label;
     return (
-      <li
+      <AnnotatableTextBlock
         key={`${activeSection.topic_title}-term-${index}`}
-        data-annotatable-block={blockId}
-        dangerouslySetInnerHTML={{
-          __html: renderTermHTML(
-            term,
-            blockAnnotations,
-            pendingSelectionForBlock(blockId),
-          ),
-        }}
-        style={{ userSelect: "text", animation: pulse ? "notePulse 1s ease-out" : undefined }}
+        as="li"
+        blockId={blockId}
+        text={text}
+        annotations={blockAnnotations}
+        pendingSelection={pendingSelectionForBlock(blockId)}
+        pulse={pulse}
+        termLabelEnd={formatted.label.length}
+        onSelection={handleTextSelection}
       />
     );
   }
 
   function openNotesFromPendingSelection() {
     if (!pendingSelection) return;
+    setSelectionState(pendingSelection);
+    setNoteContextText(pendingSelection.selectedText);
     setDrawerOpen(true);
     setActiveBubbleTab("notes");
   }
@@ -571,6 +394,7 @@ export function InteractiveSummaryReader({
   function openAIFromPendingSelection(mode: AIToolMode) {
     if (!pendingSelection) return;
     setSelectionState(pendingSelection);
+    setAiContextText(pendingSelection.selectedText);
     setDrawerOpen(true);
     setActiveBubbleTab("ai");
     setAiMode(mode);
@@ -584,12 +408,31 @@ export function InteractiveSummaryReader({
   }
 
   function handleBubbleHeadClick() {
-    setDrawerOpen((current) => !current);
+    setDrawerOpen((current) => {
+      const next = !current;
+      if (next) {
+        setSelectionState(null);
+        setPendingSelection(null);
+        setNoteContextText("");
+        setAiContextText("");
+        setNoteComposerValue("");
+      } else {
+        setSelectionState(null);
+        setPendingSelection(null);
+        setNoteContextText("");
+        setAiContextText("");
+        setNoteComposerValue("");
+      }
+      return next;
+    });
   }
 
   return (
     <section style={{ width: "100%", display: "block" }}>
-      <div ref={rootRef} onMouseUp={handleSelection} style={{ cursor: "text" }}>
+      <div
+        ref={rootRef}
+        style={{ cursor: "text" }}
+      >
         <div style={{ display: "grid", gap: "1rem", marginBottom: "1.5rem" }}>
           <div
             style={{
@@ -612,26 +455,25 @@ export function InteractiveSummaryReader({
             >
               Overall Overview
             </p>
-            <p
-              data-annotatable-block={`overview-${activeIndex}`}
-              dangerouslySetInnerHTML={{
-                __html: renderAnnotatedHTML(
-                  summary.overall_overview,
-                  topicAnnotations.filter(
-                    (annotation) => annotation.blockId === `overview-${activeIndex}`,
-                  ),
-                  pendingSelectionForBlock(`overview-${activeIndex}`),
-                ),
-              }}
+            <AnnotatableTextBlock
+              as="p"
+              blockId={`overview-${activeIndex}`}
+              text={summary.overall_overview}
+              annotations={topicAnnotations.filter(
+                (annotation) => annotation.blockId === `overview-${activeIndex}`,
+              )}
+              pendingSelection={pendingSelectionForBlock(`overview-${activeIndex}`)}
+              onSelection={handleTextSelection}
               style={{
                 fontFamily: '"Geist", "Inter", "Segoe UI", "Helvetica Neue", Arial, sans-serif',
                 fontSize: "1.05rem",
                 lineHeight: 1.85,
                 color: "#3f2a14",
-                userSelect: "text",
               }}
             />
           </div>
+          
+          <RelatedLearningVideos documentId={documentId} />
 
           <div
             style={{
@@ -697,7 +539,15 @@ export function InteractiveSummaryReader({
           >
             Detailed Topic
           </p>
-          <h2
+          <AnnotatableTextBlock
+            as="h2"
+            blockId={`title-${activeIndex}`}
+            text={activeSection.topic_title}
+            annotations={topicAnnotations.filter(
+              (annotation) => annotation.blockId === `title-${activeIndex}`,
+            )}
+            pendingSelection={pendingSelectionForBlock(`title-${activeIndex}`)}
+            onSelection={handleTextSelection}
             style={{
               fontFamily: '"Geist", "Inter", "Segoe UI", "Helvetica Neue", Arial, sans-serif',
               fontSize: "clamp(2rem, 4vw, 3rem)",
@@ -706,9 +556,7 @@ export function InteractiveSummaryReader({
               color: "#2f1c0f",
               marginBottom: "1.3rem",
             }}
-          >
-            {activeSection.topic_title}
-          </h2>
+          />
 
           <div style={{ display: "grid", gap: "1.4rem" }}>
             <div>
@@ -802,17 +650,21 @@ export function InteractiveSummaryReader({
             flexWrap: "wrap",
           }}
         >
-          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", flex: 1, justifyContent: "flex-start" }}>
             <Button
               variant="outline"
               disabled={activeIndex === 0}
               onClick={() => setActiveIndex((current) => current - 1)}
+              style={{ minHeight: "42px", minWidth: "148px", paddingInline: "18px", borderRadius: "14px" }}
             >
               Previous Topic
             </Button>
+          </div>
+          <div style={{ display: "flex", flex: 1, justifyContent: "flex-end" }}>
             <Button
               disabled={activeIndex === sections.length - 1}
               onClick={() => setActiveIndex((current) => current + 1)}
+              style={{ minHeight: "42px", minWidth: "128px", paddingInline: "18px", borderRadius: "14px" }}
             >
               Next Topic
             </Button>
@@ -834,6 +686,10 @@ export function InteractiveSummaryReader({
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 8, scale: 0.96 }}
               transition={{ duration: 0.16, ease: "easeOut" }}
+              onPointerDown={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+              }}
               onMouseDown={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
@@ -914,7 +770,7 @@ export function InteractiveSummaryReader({
                       <button
                         key={`u-${color}`}
                         type="button"
-                        onClick={() => saveUnderline(color === "neutral" ? "blue" : color)}
+                        onClick={() => saveUnderline(color)}
                         style={{
                           width: "18px",
                           height: "18px",
@@ -979,12 +835,12 @@ export function InteractiveSummaryReader({
         open={drawerOpen}
         activeTab={activeBubbleTab}
         onTabChange={setActiveBubbleTab}
-        selectedText={selectionState?.selectedText ?? pendingSelection?.selectedText ?? ""}
+        selectedText={aiContextText || selectionState?.selectedText || pendingSelection?.selectedText || ""}
         assistantInitialQuestion={assistantInitialQuestion}
         aiMode={aiMode}
         notes={topicNotes}
         noteComposerValue={noteComposerValue}
-        selectedNoteText={selectionState?.selectedText ?? pendingSelection?.selectedText ?? ""}
+        selectedNoteText={noteContextText || selectionState?.selectedText || pendingSelection?.selectedText || ""}
         onNoteComposerChange={setNoteComposerValue}
         onSaveNote={saveNote}
         onDeleteNote={deleteNote}
@@ -993,6 +849,7 @@ export function InteractiveSummaryReader({
           setDrawerOpen(true);
           setActiveBubbleTab("ai");
           setAiMode("ask-ai");
+          setAiContextText(note.selectedText ?? "");
           setSelectionState(
             note.annotationId
               ? (() => {

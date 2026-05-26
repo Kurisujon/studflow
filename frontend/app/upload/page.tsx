@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { DocumentProcessingStatus } from "@/components/document-processing-status";
 import { useDocumentStatus } from "@/hooks/use-document-status";
 import { API_BASE_URL } from "@/lib/api";
+import { useAuth } from "@clerk/nextjs";
 
 type UploadResponse = {
   document_id: string;
@@ -13,14 +14,20 @@ type UploadResponse = {
   file_url: string;
 };
 
+function isUploadResponse(payload: UploadResponse | { detail: string }): payload is UploadResponse {
+  return "document_id" in payload;
+}
+
 export default function UploadPage() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [isUploading, setIsUploading] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [documentId, setDocumentId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const hasRedirectedRef = useRef(false);
   const [pollingEnabled, setPollingEnabled] = useState(true);
+  const { getToken } = useAuth();
   const { data: statusData } = useDocumentStatus(documentId, {
     enabled: documentId !== null && pollingEnabled,
   });
@@ -39,11 +46,13 @@ export default function UploadPage() {
   useEffect(() => {
     if (statusData?.status === "COMPLETED") {
       setPollingEnabled(false);
+      setIsUploading(false);
       redirectToStudy(statusData.document_id);
     }
 
     if (statusData?.status === "FAILED") {
       setPollingEnabled(false);
+      setIsUploading(false);
       setError("Processing failed. Please try another file or review extraction quality.");
     }
   }, [redirectToStudy, statusData]);
@@ -60,10 +69,18 @@ export default function UploadPage() {
     formData.append("file", file);
 
     setError(null);
+    setIsUploading(true);
 
     try {
+      const token = await getToken();
+      const headers: HeadersInit = {};
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
       const response = await fetch(`${API_BASE_URL}/api/upload`, {
         method: "POST",
+        headers,
         body: formData,
       });
 
@@ -73,10 +90,15 @@ export default function UploadPage() {
         throw new Error("detail" in payload ? payload.detail : "Upload failed.");
       }
 
+      if (!isUploadResponse(payload)) {
+        throw new Error("Upload response was missing the document id.");
+      }
+
       setDocumentId(payload.document_id);
       hasRedirectedRef.current = false;
       setPollingEnabled(true);
     } catch (submitError) {
+      setIsUploading(false);
       setError(
         submitError instanceof Error ? submitError.message : "Upload failed.",
       );
@@ -147,7 +169,7 @@ export default function UploadPage() {
             marginBottom: "1.5rem",
           }}
         >
-          Upload one PDF or DOCX. Distill will process it asynchronously.
+          Upload one PDF or DOCX. Studflow will process it asynchronously.
         </p>
 
         <label
@@ -209,7 +231,7 @@ export default function UploadPage() {
         <button
           type="submit"
           className="btn-primary"
-          disabled={isPending}
+          disabled={isPending || isUploading}
           style={{
             minHeight: "42px",
             paddingInline: "18px",
@@ -219,7 +241,7 @@ export default function UploadPage() {
             gap: "0.6rem",
           }}
         >
-          {isPending ? (
+          {isUploading || isPending ? (
             <span
               style={{
                 width: "14px",
@@ -232,7 +254,7 @@ export default function UploadPage() {
               }}
             />
           ) : null}
-          {isPending ? "Submitting..." : "Upload and Process"}
+          {isUploading || isPending ? "Uploading..." : "Upload and Process"}
         </button>
       </form>
     </section>

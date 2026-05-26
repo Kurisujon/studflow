@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { CheckCircle2 } from "lucide-react";
+import { motion } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -11,10 +13,12 @@ export function QuizStudy({
 }: {
   questions: StudyQuizQuestion[];
 }) {
+  const PASSING_SCORE_RATIO = 0.7;
   const router = useRouter();
   const [activeIndex, setActiveIndex] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState<Record<number, number>>({});
   const [showScore, setShowScore] = useState(false);
+  const hasCelebratedRef = useRef(false);
 
   if (questions.length === 0) {
     return <p>No quiz available yet.</p>;
@@ -27,6 +31,33 @@ export function QuizStudy({
   const score = questions.reduce((total, currentQuestion, index) => {
     return total + Number(selectedAnswers[index] === currentQuestion.correct_answer_index);
   }, 0);
+  const passingScore = Math.ceil(questions.length * PASSING_SCORE_RATIO);
+  const passed = score >= passingScore;
+
+  useEffect(() => {
+    if (!showScore || !passed || hasCelebratedRef.current) {
+      return;
+    }
+
+    let isMounted = true;
+
+    import("canvas-confetti").then((module) => {
+      if (!isMounted) return;
+
+      hasCelebratedRef.current = true;
+      const confetti = module.default;
+
+      confetti({
+        particleCount: 80,
+        spread: 70,
+        origin: { y: 0.65 },
+      });
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [passed, showScore]);
 
   function handleSelectOption(optionIndex: number) {
     if (answered) {
@@ -52,16 +83,25 @@ export function QuizStudy({
     setActiveIndex(0);
     setSelectedAnswers({});
     setShowScore(false);
+    hasCelebratedRef.current = false;
   }
 
   if (showScore) {
     return (
-      <section
+      <motion.section
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.25, ease: "easeOut" }}
         style={{
           border: "1px solid var(--distill-border)",
           borderRadius: "28px",
           padding: "2rem",
-          backgroundColor: "rgba(255,255,255,0.84)",
+          background:
+            passed
+              ? "linear-gradient(180deg, rgba(255,255,255,0.95), rgba(255,248,235,0.96))"
+              : "linear-gradient(180deg, rgba(255,255,255,0.95), rgba(250,250,249,0.96))",
+          position: "relative",
+          overflow: "hidden",
         }}
       >
         <p
@@ -71,23 +111,57 @@ export function QuizStudy({
             textTransform: "uppercase",
             color: "var(--distill-text-muted)",
             marginBottom: "0.75rem",
+            position: "relative",
           }}
         >
-          Quiz Complete
+          {passed ? "Quiz Complete" : "Try Again"}
         </p>
-        <h2 style={{ marginBottom: "0.75rem" }}>
+        {passed ? (
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.45rem",
+              marginBottom: "0.9rem",
+              padding: "0.45rem 0.75rem",
+              borderRadius: "999px",
+              backgroundColor: "rgba(22,163,74,0.10)",
+              border: "1px solid rgba(22,163,74,0.18)",
+              color: "#166534",
+              position: "relative",
+            }}
+          >
+            <CheckCircle2 size={16} />
+            <span style={{ fontSize: "0.88rem", fontWeight: 600 }}>Passed</span>
+          </div>
+        ) : null}
+        <h2 style={{ marginBottom: "0.75rem", position: "relative" }}>
           Final score: {score} / {questions.length}
         </h2>
-        <p style={{ marginBottom: "1.5rem" }}>
-          Review the quiz again or return to the dashboard for another document.
+        <p style={{ marginBottom: "0.45rem", position: "relative" }}>
+          Passing score: {passingScore} / {questions.length}
+        </p>
+        <p style={{ marginBottom: "1.5rem", position: "relative" }}>
+          {passed
+            ? "You passed. Review the material again or continue with another study session."
+            : "You did not reach the passing score yet. Review the quiz again or return to the dashboard for more practice."}
         </p>
         <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-          <Button onClick={handleRetake}>Retake Quiz</Button>
-          <Button variant="outline" onClick={() => router.push("/dashboard")}>
+          <Button
+            onClick={handleRetake}
+            style={{ minHeight: "42px", paddingInline: "18px", borderRadius: "14px" }}
+          >
+            {passed ? "Retake Quiz" : "Try Again"}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => router.push("/dashboard")}
+            style={{ minHeight: "42px", paddingInline: "18px", borderRadius: "14px" }}
+          >
             Return to Dashboard
           </Button>
         </div>
-      </section>
+      </motion.section>
     );
   }
 
@@ -187,6 +261,13 @@ export function QuizStudy({
       <Button
         onClick={handleNext}
         disabled={!answered}
+        style={{
+          minHeight: "42px",
+          minWidth: activeIndex === questions.length - 1 ? "126px" : "146px",
+          paddingInline: "18px",
+          borderRadius: "14px",
+          whiteSpace: "nowrap",
+        }}
       >
         {activeIndex === questions.length - 1 ? "Show Score" : "Next Question"}
       </Button>

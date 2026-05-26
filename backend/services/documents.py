@@ -25,9 +25,11 @@ def create_document_record(
     file_url: str,
     file_size_bytes: int,
     user_id: uuid.UUID | None = None,
+    clerk_user_id: str | None = None,
 ) -> Document:
     document = Document(
         user_id=user_id,
+        clerk_user_id=clerk_user_id,
         filename=filename,
         file_url=file_url,
         status=DocumentStatus.PENDING,
@@ -139,3 +141,31 @@ def save_quiz(
     session.commit()
     session.refresh(quiz)
     return quiz
+
+
+def save_related_videos(
+    *,
+    session: Session,
+    document_id: uuid.UUID,
+    videos: list[dict],
+    relevance_reason: str = "",
+) -> list[RelatedVideo]:
+    from models.tables import RelatedVideo
+    records = []
+    for video in videos:
+        record = RelatedVideo(
+            document_id=document_id,
+            title=video["title"],
+            channel_title=video["channel_title"],
+            video_id=video["video_id"],
+            url=video["url"],
+            thumbnail_url=video["thumbnail_url"],
+            description=video["description"],
+            relevance_reason=relevance_reason,
+            published_at=video.get("published_at", ""),
+        )
+        records.append(record)
+    
+    session.add_all(records)
+    session.commit()
+    return records

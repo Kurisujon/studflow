@@ -3,6 +3,7 @@
 import { useEffect, useEffectEvent, useState } from "react";
 
 import { API_BASE_URL } from "@/lib/api";
+import { useAuth } from "@clerk/nextjs";
 
 export type DocumentStatusResponse = {
   document_id: string;
@@ -35,6 +36,8 @@ export function useDocumentStatus(
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const { getToken } = useAuth();
+
   const fetchStatus = useEffectEvent(async () => {
     if (!documentId || !enabled) {
       return;
@@ -43,10 +46,17 @@ export function useDocumentStatus(
     setIsLoading(true);
 
     try {
+      const token = await getToken();
+      const headers: HeadersInit = {};
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
       const response = await fetch(
         `${API_BASE_URL}/api/documents/${documentId}/status`,
         {
           cache: "no-store",
+          headers,
         },
       );
 

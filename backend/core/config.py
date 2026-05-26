@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     )
 
     # Application
-    app_name: str = "Distill API"
+    app_name: str = "Studflow API"
     app_version: str = "0.1.0"
     debug: bool = False
     auto_create_tables: bool = False
@@ -45,10 +45,18 @@ class Settings(BaseSettings):
             return []
         return [k.strip() for k in self.gemini_api_key.split(",") if k.strip()]
 
+    # YouTube API
+    youtube_api_key: str = ""
+
     # Security
     secret_key: str = "change-this-to-a-strong-secret-key-in-production"
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24  # 24 hours
+
+    # Clerk Auth
+    clerk_jwks_url: str = ""
+    clerk_issuer: str = ""
+    clerk_audience: str = ""
 
     # CORS
     allowed_origins: list[str] = ["http://localhost:3000", "http://localhost:3002"]

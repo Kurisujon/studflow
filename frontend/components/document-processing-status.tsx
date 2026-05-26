@@ -81,7 +81,7 @@ export function DocumentProcessingStatus({
           marginBottom: "1.75rem",
         }}
       >
-        Distill is turning the uploaded material into a summary, flashcards, and a quiz.
+        Studflow is turning the uploaded material into a summary, flashcards, and a quiz.
       </p>
 
       <div

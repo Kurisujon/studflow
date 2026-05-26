@@ -51,7 +51,7 @@ export default function HomePage() {
           color: "var(--color-text-secondary)",
         }}
       >
-        Upload a PDF or DOCX. Distill generates a concise summary, 15
+        Upload a PDF or DOCX. Studflow generates a concise summary, 15
         flashcards, and a 10-question quiz — in seconds.
       </p>
 

@@ -24,7 +24,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
-    description="Backend API for the Distill AI Study Workflow System.",
+    description="Backend API for the Studflow AI Study Workflow System.",
     lifespan=lifespan,
 )
 

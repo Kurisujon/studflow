@@ -62,6 +62,7 @@ class Document(SQLModel, table=True):
         nullable=True,
         index=True,
     )
+    clerk_user_id: Optional[str] = Field(default=None, index=True)
     filename: str = Field(max_length=255, nullable=False)
     file_url: str = Field(max_length=1024, nullable=False)
     status: DocumentStatus = Field(
@@ -79,6 +80,7 @@ class Document(SQLModel, table=True):
     chunks: list["DocumentChunk"] = Relationship(back_populates="document")
     flashcards: list["Flashcard"] = Relationship(back_populates="document")
     quiz: Optional["Quiz"] = Relationship(back_populates="document")
+    related_videos: list["RelatedVideo"] = Relationship(back_populates="document")
 
 
 # ---------------------------------------------------------------------------
@@ -203,5 +205,35 @@ class QuizQuestion(SQLModel, table=True):
     order_index: int = Field(default=0, nullable=False)
     created_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
 
-    # Relationships
     quiz: Optional[Quiz] = Relationship(back_populates="questions")
+
+
+# ---------------------------------------------------------------------------
+# RelatedVideo
+# ---------------------------------------------------------------------------
+
+
+class RelatedVideo(SQLModel, table=True):
+    __tablename__ = "related_videos"
+
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        primary_key=True,
+        index=True,
+        nullable=False,
+    )
+    document_id: uuid.UUID = Field(
+        foreign_key="documents.id", nullable=False, index=True
+    )
+    title: str = Field(nullable=False)
+    channel_title: str = Field(nullable=False)
+    video_id: str = Field(nullable=False)
+    url: str = Field(nullable=False)
+    thumbnail_url: str = Field(nullable=False)
+    description: str = Field(nullable=False)
+    relevance_reason: str = Field(nullable=False)
+    published_at: str = Field(default="", nullable=False)
+    created_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
+
+    # Relationships
+    document: Optional[Document] = Relationship(back_populates="related_videos")

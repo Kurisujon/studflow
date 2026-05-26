@@ -4,11 +4,12 @@ import json
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
 from core.database import engine
+from core.auth import get_current_user, CurrentUser
 from models.tables import Document, DocumentChunk, DocumentStatus, Flashcard, Quiz, QuizQuestion, Summary
 from services.ai_service import ComprehensiveSummary, explain_selection
 
@@ -128,10 +129,12 @@ def _format_summary_text(summary: ComprehensiveSummary | None) -> str | None:
 
 
 @router.get("/documents", response_model=list[DocumentListItem])
-def list_documents() -> list[DocumentListItem]:
+def list_documents(current_user: CurrentUser = Depends(get_current_user)) -> list[DocumentListItem]:
     with Session(engine) as session:
         documents = session.exec(
-            select(Document).order_by(Document.created_at.desc())
+            select(Document)
+            .where(Document.clerk_user_id == current_user.clerk_user_id)
+            .order_by(Document.created_at.desc())
         ).all()
 
         items: list[DocumentListItem] = []
@@ -167,10 +170,12 @@ def list_documents() -> list[DocumentListItem]:
 
 
 @router.get("/documents/{document_id}/status", response_model=DocumentStatusResponse)
-def get_document_status(document_id: uuid.UUID) -> DocumentStatusResponse:
+def get_document_status(document_id: uuid.UUID, current_user: CurrentUser = Depends(get_current_user)) -> DocumentStatusResponse:
     with Session(engine) as session:
         document = session.exec(
-            select(Document).where(Document.id == document_id)
+            select(Document)
+            .where(Document.id == document_id)
+            .where(Document.clerk_user_id == current_user.clerk_user_id)
         ).first()
 
         if document is None:
@@ -206,10 +211,12 @@ def get_document_status(document_id: uuid.UUID) -> DocumentStatusResponse:
 
 
 @router.get("/documents/{document_id}/study", response_model=StudyDocumentResponse)
-def get_study_document(document_id: uuid.UUID) -> StudyDocumentResponse:
+def get_study_document(document_id: uuid.UUID, current_user: CurrentUser = Depends(get_current_user)) -> StudyDocumentResponse:
     with Session(engine) as session:
         document = session.exec(
-            select(Document).where(Document.id == document_id)
+            select(Document)
+            .where(Document.id == document_id)
+            .where(Document.clerk_user_id == current_user.clerk_user_id)
         ).first()
 
         if document is None:
@@ -271,10 +278,12 @@ def get_study_document(document_id: uuid.UUID) -> StudyDocumentResponse:
 
 
 @router.get("/documents/{document_id}/chunks", response_model=list[DocumentChunkResponse])
-def get_document_chunks(document_id: uuid.UUID) -> list[DocumentChunkResponse]:
+def get_document_chunks(document_id: uuid.UUID, current_user: CurrentUser = Depends(get_current_user)) -> list[DocumentChunkResponse]:
     with Session(engine) as session:
         document = session.exec(
-            select(Document).where(Document.id == document_id)
+            select(Document)
+            .where(Document.id == document_id)
+            .where(Document.clerk_user_id == current_user.clerk_user_id)
         ).first()
 
         if document is None:
@@ -300,7 +309,7 @@ def get_document_chunks(document_id: uuid.UUID) -> list[DocumentChunkResponse]:
 
 
 @router.post("/ai/explain-selection", response_model=ExplainSelectionResponse)
-def explain_study_selection(payload: ExplainSelectionRequest) -> ExplainSelectionResponse:
+def explain_study_selection(payload: ExplainSelectionRequest, current_user: CurrentUser = Depends(get_current_user)) -> ExplainSelectionResponse:
     if not payload.highlighted_text.strip():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -319,3 +328,58 @@ def explain_study_selection(payload: ExplainSelectionRequest) -> ExplainSelectio
         relatedTerms=explanation.related_terms,
         suggestedFlashcard=explanation.suggested_flashcard.model_dump(),
     )
+
+
+class RelatedVideoResponse(BaseModel):
+    id: uuid.UUID
+    title: str
+    channelTitle: str
+    videoId: str
+    url: str
+    thumbnailUrl: str
+    description: str
+    relevanceReason: str
+    publishedAt: str
+
+class RelatedVideosListResponse(BaseModel):
+    videos: list[RelatedVideoResponse]
+
+
+@router.get("/documents/{document_id}/related-videos", response_model=RelatedVideosListResponse)
+def get_related_videos(document_id: uuid.UUID, current_user: CurrentUser = Depends(get_current_user)) -> RelatedVideosListResponse:
+    from models.tables import RelatedVideo
+    with Session(engine) as session:
+        document = session.exec(
+            select(Document)
+            .where(Document.id == document_id)
+            .where(Document.clerk_user_id == current_user.clerk_user_id)
+        ).first()
+
+        if document is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Document not found.",
+            )
+
+        videos = session.exec(
+            select(RelatedVideo)
+            .where(RelatedVideo.document_id == document_id)
+            .order_by(RelatedVideo.created_at.asc())
+        ).all()
+
+        return RelatedVideosListResponse(
+            videos=[
+                RelatedVideoResponse(
+                    id=v.id,
+                    title=v.title,
+                    channelTitle=v.channel_title,
+                    videoId=v.video_id,
+                    url=v.url,
+                    thumbnailUrl=v.thumbnail_url,
+                    description=v.description,
+                    relevanceReason=v.relevance_reason,
+                    publishedAt=v.published_at,
+                )
+                for v in videos
+            ]
+        )

@@ -7,6 +7,7 @@ export type AnnotationColor =
   | "green"
   | "pink"
   | "purple";
+export type UnderlineColor = AnnotationColor | "neutral";
 
 export type Annotation = {
   id: string;
@@ -17,9 +18,20 @@ export type Annotation = {
   blockId: string;
   type: AnnotationType;
   color?: AnnotationColor;
+  underlineColor?: UnderlineColor;
   noteContent?: string;
   createdAt: string;
   updatedAt: string;
+};
+
+export type StudyAnnotation = Annotation;
+
+export type TextSelectionPayload = {
+  blockId: string;
+  selectedText: string;
+  startOffset: number;
+  endOffset: number;
+  rect: DOMRect;
 };
 
 export type AIExplanation = {

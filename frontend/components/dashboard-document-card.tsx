@@ -132,6 +132,8 @@ export function DashboardDocumentCard({
           nativeButton={false}
           render={<Link href={`/dashboard/study/${document.id}?tab=summary`} />}
           variant="default"
+          size="lg"
+          style={{ minHeight: "42px", paddingInline: "16px", borderRadius: "14px", color: "#ffffff", backgroundColor: "#111110" }}
         >
           Summary
         </Button>
@@ -139,6 +141,8 @@ export function DashboardDocumentCard({
           nativeButton={false}
           render={<Link href={`/dashboard/study/${document.id}?tab=flashcards`} />}
           variant="outline"
+          size="lg"
+          style={{ minHeight: "42px", paddingInline: "16px", borderRadius: "14px", color: "#2f1c0f", backgroundColor: "rgba(255,255,255,0.86)" }}
         >
           Flashcards
         </Button>
@@ -146,6 +150,8 @@ export function DashboardDocumentCard({
           nativeButton={false}
           render={<Link href={`/dashboard/study/${document.id}?tab=quiz`} />}
           variant="outline"
+          size="lg"
+          style={{ minHeight: "42px", paddingInline: "16px", borderRadius: "14px", color: "#2f1c0f", backgroundColor: "rgba(255,255,255,0.86)" }}
         >
           Quiz
         </Button>

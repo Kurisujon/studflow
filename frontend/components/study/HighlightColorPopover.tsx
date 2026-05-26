@@ -6,7 +6,7 @@ const COLORS: Array<{ color: AnnotationColor; label: string; swatch: string }> =
   { color: "yellow", label: "Important", swatch: "#facc15" },
   { color: "blue", label: "Concept", swatch: "#60a5fa" },
   { color: "green", label: "Remembered", swatch: "#34d399" },
-  { color: "red", label: "Confusing", swatch: "#fb7185" },
+  { color: "pink", label: "Confusing", swatch: "#fb7185" },
   { color: "purple", label: "Exam-related", swatch: "#c084fc" },
 ];
 

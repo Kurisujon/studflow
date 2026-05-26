@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 
 import { AIStudyAssistantPanel } from "@/components/study/AIStudyAssistantPanel";
 import { NotesPanel } from "@/components/study/NotesPanel";
-import type { AIToolMode, SelectionState, StudyBubbleTab, StudyNote } from "@/types/annotations";
+import type { AIToolMode, StudyBubbleTab, StudyNote } from "@/types/annotations";
 
 export function StudySidePanel({
   open,
