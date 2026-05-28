@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 
 import { Button } from "@/components/ui/button";
 import type { StudyFlashcard } from "@/lib/types";
+
+const CARD_FLIP_DURATION_MS = 500;
 
 export function FlashcardStudy({
   flashcards,
@@ -13,6 +15,16 @@ export function FlashcardStudy({
 }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
+  const [isChangingCard, setIsChangingCard] = useState(false);
+  const cardChangeTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (cardChangeTimeoutRef.current) {
+        window.clearTimeout(cardChangeTimeoutRef.current);
+      }
+    };
+  }, []);
 
   if (flashcards.length === 0) {
     return <p>No flashcards available yet.</p>;
@@ -22,8 +34,26 @@ export function FlashcardStudy({
   const progress = ((activeIndex + 1) / flashcards.length) * 100;
 
   function changeCard(nextIndex: number) {
-    setActiveIndex(nextIndex);
+    if (nextIndex < 0 || nextIndex >= flashcards.length || isChangingCard) {
+      return;
+    }
+
+    if (cardChangeTimeoutRef.current) {
+      window.clearTimeout(cardChangeTimeoutRef.current);
+    }
+
+    if (!isFlipped) {
+      setActiveIndex(nextIndex);
+      return;
+    }
+
+    setIsChangingCard(true);
     setIsFlipped(false);
+    cardChangeTimeoutRef.current = window.setTimeout(() => {
+      setActiveIndex(nextIndex);
+      setIsChangingCard(false);
+      cardChangeTimeoutRef.current = null;
+    }, CARD_FLIP_DURATION_MS);
   }
 
   return (
@@ -70,9 +100,13 @@ export function FlashcardStudy({
       <div style={{ perspective: "1400px", marginBottom: "1.2rem" }}>
         <motion.button
           type="button"
-          onClick={() => setIsFlipped((current) => !current)}
+          onClick={() => {
+            if (!isChangingCard) {
+              setIsFlipped((current) => !current);
+            }
+          }}
           animate={{ rotateY: isFlipped ? 180 : 0 }}
-          transition={{ duration: 0.5, ease: "easeInOut" }}
+          transition={{ duration: CARD_FLIP_DURATION_MS / 1000, ease: "easeInOut" }}
           style={{
             width: "100%",
             minHeight: "360px",
@@ -139,7 +173,7 @@ export function FlashcardStudy({
       <div style={{ display: "flex", gap: "0.75rem" }}>
         <Button
           variant="outline"
-          disabled={activeIndex === 0}
+          disabled={activeIndex === 0 || isChangingCard}
           onClick={() => changeCard(activeIndex - 1)}
           style={{ minHeight: "42px", minWidth: "120px", paddingInline: "18px", borderRadius: "14px" }}
         >
@@ -147,7 +181,7 @@ export function FlashcardStudy({
         </Button>
         <Button
           variant="default"
-          disabled={activeIndex === flashcards.length - 1}
+          disabled={activeIndex === flashcards.length - 1 || isChangingCard}
           onClick={() => changeCard(activeIndex + 1)}
           style={{ minHeight: "42px", minWidth: "96px", paddingInline: "18px", borderRadius: "14px" }}
         >

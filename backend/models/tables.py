@@ -81,6 +81,8 @@ class Document(SQLModel, table=True):
     flashcards: list["Flashcard"] = Relationship(back_populates="document")
     quiz: Optional["Quiz"] = Relationship(back_populates="document")
     related_videos: list["RelatedVideo"] = Relationship(back_populates="document")
+    annotations: list["StudyAnnotation"] = Relationship(back_populates="document")
+    ai_history_items: list["AIHistory"] = Relationship(back_populates="document")
 
 
 # ---------------------------------------------------------------------------
@@ -237,3 +239,65 @@ class RelatedVideo(SQLModel, table=True):
 
     # Relationships
     document: Optional[Document] = Relationship(back_populates="related_videos")
+
+
+# ---------------------------------------------------------------------------
+# StudyAnnotation
+# ---------------------------------------------------------------------------
+
+
+class StudyAnnotation(SQLModel, table=True):
+    __tablename__ = "study_annotations"
+
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        primary_key=True,
+        index=True,
+        nullable=False,
+    )
+    document_id: uuid.UUID = Field(
+        foreign_key="documents.id", nullable=False, index=True
+    )
+    block_id: str = Field(nullable=False)
+    selected_text: str = Field(nullable=False)
+    start_offset: int = Field(nullable=False)
+    end_offset: int = Field(nullable=False)
+    type: str = Field(nullable=False)  # highlight, underline, note
+    color: Optional[str] = Field(default=None)
+    underline_color: Optional[str] = Field(default=None)
+    note_content: Optional[str] = Field(default=None)
+    deleted_at: Optional[datetime] = Field(default=None, nullable=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
+    updated_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
+
+    # Relationships
+    document: Optional[Document] = Relationship(back_populates="annotations")
+
+
+# ---------------------------------------------------------------------------
+# AIHistory
+# ---------------------------------------------------------------------------
+
+
+class AIHistory(SQLModel, table=True):
+    __tablename__ = "ai_history"
+
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        primary_key=True,
+        index=True,
+        nullable=False,
+    )
+    document_id: uuid.UUID = Field(
+        foreign_key="documents.id", nullable=False, index=True
+    )
+    source: str = Field(nullable=False)  # selection, note, general
+    source_text: str = Field(default="", nullable=False)
+    note_content: Optional[str] = Field(default=None)
+    question: str = Field(nullable=False)
+    mode: str = Field(nullable=False)
+    answer: str = Field(nullable=False)
+    created_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
+
+    # Relationships
+    document: Optional[Document] = Relationship(back_populates="ai_history_items")

@@ -24,3 +24,9 @@
 - [ ] Build Document Summary View.
 - [ ] Build Interactive Flashcard UI (with flip animations and progress tracking).
 - [ ] Build Multiple-Choice Quiz UI (with instant feedback and scoring).
+
+## Future History Enhancements
+- [ ] Quiz Attempt History: score, date/time, incorrect answers, and retake result.
+- [ ] Document Processing History: uploaded date, processing status, retry attempts, and AI failure reason.
+- [ ] Note Edit History: previous note content, updated note content, and timestamp.
+- [ ] Study Activity History: viewed document, completed quiz, reviewed flashcards, and asked AI.

@@ -1,6 +1,8 @@
 "use client";
 
+import { useRef } from "react";
 import type { CSSProperties, ReactNode } from "react";
+import { StickyNote } from "lucide-react";
 
 import type {
   StudyAnnotation,
@@ -31,6 +33,7 @@ export interface AnnotatableTextBlockProps {
   text: string;
   annotations: StudyAnnotation[];
   onSelection: (payload: TextSelectionPayload) => void;
+  onNoteClick?: (annotationId: string) => void;
   className?: string;
   as?: AnnotatableElement;
   style?: CSSProperties;
@@ -39,18 +42,8 @@ export interface AnnotatableTextBlockProps {
   termLabelEnd?: number;
 }
 
-function annotationRangeKey(annotation: StudyAnnotation) {
-  return `${annotation.blockId}:${annotation.startOffset}:${annotation.endOffset}`;
-}
-
-function getBlockForNode(node: Node | null) {
-  if (!node) return null;
-  const element =
-    node.nodeType === Node.ELEMENT_NODE
-      ? (node as Element)
-      : node.parentElement;
-
-  return element?.closest<HTMLElement>("[data-annotatable-block]") ?? null;
+function normalizeSelectionText(value: string) {
+  return value.replace(/\s+/g, " ").trim();
 }
 
 function getTextOffset(root: HTMLElement, node: Node, offset: number) {
@@ -76,7 +69,7 @@ function getTextOffset(root: HTMLElement, node: Node, offset: number) {
     currentNode = walker.nextNode();
   }
 
-  return total;
+  return -1;
 }
 
 function renderTextWithOptionalTermLabel(
@@ -114,46 +107,29 @@ function renderAnnotatedNodes({
   annotations,
   pendingSelection,
   termLabelEnd,
+  onNoteClick,
 }: {
   text: string;
   blockId: string;
   annotations: StudyAnnotation[];
   pendingSelection?: { startOffset: number; endOffset: number } | null;
   termLabelEnd?: number;
+  onNoteClick?: (annotationId: string) => void;
 }) {
-  const grouped = new Map<
-    string,
-    {
-      start: number;
-      end: number;
-      highlight?: StudyAnnotation;
-      underline?: StudyAnnotation;
-      note?: StudyAnnotation;
-    }
-  >();
-
-  for (const annotation of annotations) {
-    const key = annotationRangeKey(annotation);
-    const current = grouped.get(key) ?? {
-      start: annotation.startOffset,
-      end: annotation.endOffset,
-    };
-
-    if (annotation.type === "highlight") current.highlight = annotation;
-    if (annotation.type === "underline") current.underline = annotation;
-    if (annotation.type === "note") current.note = annotation;
-
-    grouped.set(key, current);
-  }
-
-  const ranges = [...grouped.values()].filter(
-    (item) => item.start >= 0 && item.end <= text.length && item.start < item.end,
-  );
+  const blockAnnotations = annotations
+    .filter(
+      (annotation) =>
+        annotation.blockId === blockId &&
+        annotation.startOffset >= 0 &&
+        annotation.endOffset <= text.length &&
+        annotation.startOffset < annotation.endOffset,
+    )
+    .sort((a, b) => a.startOffset - b.startOffset || a.endOffset - b.endOffset);
   const breakpoints = new Set([0, text.length]);
 
-  for (const item of ranges) {
-    breakpoints.add(item.start);
-    breakpoints.add(item.end);
+  for (const annotation of blockAnnotations) {
+    breakpoints.add(annotation.startOffset);
+    breakpoints.add(annotation.endOffset);
   }
 
   if (
@@ -179,7 +155,12 @@ function renderAnnotatedNodes({
     if (start === end) continue;
 
     const slice = text.slice(start, end);
-    const item = ranges.find((range) => range.start <= start && range.end >= end);
+    const segmentAnnotations = blockAnnotations.filter(
+      (annotation) => annotation.startOffset <= start && annotation.endOffset >= end,
+    );
+    const highlight = segmentAnnotations.find((annotation) => annotation.type === "highlight");
+    const underline = segmentAnnotations.find((annotation) => annotation.type === "underline");
+    const note = segmentAnnotations.find((annotation) => annotation.type === "note");
     const isPending =
       pendingSelection !== null &&
       pendingSelection !== undefined &&
@@ -188,26 +169,33 @@ function renderAnnotatedNodes({
     const style: CSSProperties = {};
 
     if (isPending) {
-      style.background = "rgba(59,130,246,0.22)";
+      style.backgroundColor = "rgba(59,130,246,0.22)";
       style.borderRadius = "0.25rem";
     }
 
-    if (item?.highlight?.color) {
-      style.backgroundColor = HIGHLIGHT_COLOR_MAP[item.highlight.color];
+    if (highlight?.color) {
+      style.backgroundColor = HIGHLIGHT_COLOR_MAP[highlight.color];
       style.borderRadius = "0.3rem";
       style.padding = "0 0.08rem";
     }
 
-    if (item?.underline?.underlineColor) {
+    if (underline?.underlineColor) {
       style.textDecorationLine = "underline";
-      style.textDecorationColor = UNDERLINE_COLOR_MAP[item.underline.underlineColor];
+      style.textDecorationColor = UNDERLINE_COLOR_MAP[underline.underlineColor];
       style.textDecorationThickness = "2px";
       style.textUnderlineOffset = "3px";
     }
 
+    if (note) {
+      style.borderBottom = "1px dashed #f59e0b";
+      style.borderRadius = "0.2rem";
+      style.cursor = "pointer";
+    }
+
     const content = renderTextWithOptionalTermLabel(slice, start, termLabelEnd);
-    const annotationId = item?.note?.id ?? item?.highlight?.id ?? item?.underline?.id;
-    const shouldRenderSpan = isPending || item || Object.keys(style).length > 0;
+    const annotationId = note?.id ?? highlight?.id ?? underline?.id;
+    const annotationType = note?.type ?? highlight?.type ?? underline?.type;
+    const shouldRenderSpan = isPending || segmentAnnotations.length > 0 || Object.keys(style).length > 0;
 
     if (!shouldRenderSpan) {
       nodes.push(<span key={`${start}-${end}`}>{content}</span>);
@@ -218,25 +206,37 @@ function renderAnnotatedNodes({
       <span
         key={`${start}-${end}`}
         data-annotation-id={annotationId}
-        data-annotation-type={item?.note?.type ?? item?.highlight?.type ?? item?.underline?.type}
-        data-annotatable-block={blockId}
+        data-annotation-type={annotationType}
+        onClick={
+          note
+            ? (event) => {
+                event.stopPropagation();
+                onNoteClick?.(note.id);
+              }
+            : undefined
+        }
         style={style}
       >
         {content}
-        {item?.note && end === item.note.endOffset ? (
-          <sup
+        {note && end === note.endOffset ? (
+          <span
             data-annotation-marker="true"
-            data-note-id={item.note.id}
+            data-note-id={note.id}
             style={{
+              display: "inline-flex",
               marginLeft: "0.22rem",
-              color: "#c2410c",
-              fontWeight: 700,
+              verticalAlign: "-0.1rem",
+              color: "#d97706",
               cursor: "pointer",
               userSelect: "none",
             }}
+            onClick={(event) => {
+              event.stopPropagation();
+              onNoteClick?.(note.id);
+            }}
           >
-            ●
-          </sup>
+            <StickyNote className="h-3.5 w-3.5" />
+          </span>
         ) : null}
       </span>,
     );
@@ -250,6 +250,7 @@ export function AnnotatableTextBlock({
   text,
   annotations,
   onSelection,
+  onNoteClick,
   className,
   as = "span",
   style,
@@ -257,38 +258,62 @@ export function AnnotatableTextBlock({
   pulse,
   termLabelEnd,
 }: AnnotatableTextBlockProps) {
+  const blockRef = useRef<HTMLElement | null>(null);
+
   function captureSelection() {
+    const blockRoot = blockRef.current;
     const selection = window.getSelection();
-    if (!selection || selection.isCollapsed || selection.rangeCount === 0) {
+    if (!blockRoot || !selection || selection.isCollapsed || selection.rangeCount === 0) {
       return;
     }
 
-    const range = selection.getRangeAt(0);
-    const startBlock = getBlockForNode(range.startContainer);
-    const endBlock = getBlockForNode(range.endContainer);
-
     if (
-      !startBlock ||
-      !endBlock ||
-      startBlock !== endBlock ||
-      startBlock.dataset.annotatableBlock !== blockId
+      !blockRoot.contains(selection.anchorNode) ||
+      !blockRoot.contains(selection.focusNode)
     ) {
       return;
     }
 
-    const selectedText = selection.toString().trim();
-    if (!selectedText) return;
+    const browserSelectedText = selection.toString().trim();
+    if (!browserSelectedText) return;
 
-    const startOffset = getTextOffset(startBlock, range.startContainer, range.startOffset);
-    const endOffset = getTextOffset(startBlock, range.endContainer, range.endOffset);
+    const range = selection.getRangeAt(0);
+    const rawStartOffset = getTextOffset(blockRoot, range.startContainer, range.startOffset);
+    const rawEndOffset = getTextOffset(blockRoot, range.endContainer, range.endOffset);
+    if (rawStartOffset < 0 || rawEndOffset < 0) return;
 
-    if (startOffset === endOffset) return;
+    let startOffset = Math.min(rawStartOffset, rawEndOffset);
+    let endOffset = Math.max(rawStartOffset, rawEndOffset);
+
+    const rawSelectedText = text.slice(startOffset, endOffset);
+    const leadingWhitespace = rawSelectedText.match(/^\s*/)?.[0].length ?? 0;
+    const trailingWhitespace = rawSelectedText.match(/\s*$/)?.[0].length ?? 0;
+    startOffset += leadingWhitespace;
+    endOffset -= trailingWhitespace;
+
+    if (startOffset >= endOffset) return;
+
+    const selectedTextFromOffsets = text.slice(startOffset, endOffset).trim();
+    if (
+      !selectedTextFromOffsets ||
+      normalizeSelectionText(browserSelectedText) !==
+        normalizeSelectionText(selectedTextFromOffsets)
+    ) {
+      console.warn("Annotation selection offset mismatch", {
+        blockId,
+        selectedTextFromBrowser: browserSelectedText,
+        selectedTextFromOffsets,
+        normalizedStart: startOffset,
+        normalizedEnd: endOffset,
+      });
+      return;
+    }
 
     onSelection({
       blockId,
-      selectedText,
-      startOffset: Math.min(startOffset, endOffset),
-      endOffset: Math.max(startOffset, endOffset),
+      selectedText: browserSelectedText,
+      startOffset,
+      endOffset,
       rect: range.getBoundingClientRect(),
     });
   }
@@ -296,7 +321,11 @@ export function AnnotatableTextBlock({
   const Component = as;
   return (
     <Component
+      ref={(element: HTMLElement | null) => {
+        blockRef.current = element;
+      }}
       data-annotatable-block={blockId}
+      data-annotatable-root="true"
       className={className}
       onPointerUpCapture={() => window.setTimeout(captureSelection, 0)}
       onMouseUpCapture={() => window.setTimeout(captureSelection, 0)}
@@ -312,6 +341,7 @@ export function AnnotatableTextBlock({
         annotations,
         pendingSelection,
         termLabelEnd,
+        onNoteClick,
       })}
     </Component>
   );

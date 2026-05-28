@@ -4,36 +4,48 @@ import { AnimatePresence, motion } from "framer-motion";
 
 import { AIStudyAssistantPanel } from "@/components/study/AIStudyAssistantPanel";
 import { NotesPanel } from "@/components/study/NotesPanel";
-import type { AIToolMode, StudyBubbleTab, StudyNote } from "@/types/annotations";
+import type { AIToolMode, StudyAIContext, StudyBubbleTab, StudyNote } from "@/types/annotations";
 
 export function StudySidePanel({
   open,
+  documentId,
   activeTab,
   onTabChange,
   selectedText,
+  aiContext,
   assistantInitialQuestion,
   aiMode,
   notes,
+  deletedNotes,
+  focusedNoteId,
   noteComposerValue,
   selectedNoteText,
   onNoteComposerChange,
   onSaveNote,
   onDeleteNote,
+  onRestoreNote,
+  onForceDeleteNote,
   onJumpToText,
   onAskAINote,
 }: {
   open: boolean;
+  documentId: string;
   activeTab: StudyBubbleTab;
   onTabChange: (tab: StudyBubbleTab) => void;
   selectedText: string;
+  aiContext: StudyAIContext;
   assistantInitialQuestion?: string;
   aiMode: AIToolMode;
   notes: StudyNote[];
+  deletedNotes: StudyNote[];
+  focusedNoteId: string | null;
   noteComposerValue: string;
   selectedNoteText: string;
   onNoteComposerChange: (value: string) => void;
   onSaveNote: () => void;
   onDeleteNote: (noteId: string) => void;
+  onRestoreNote: (noteId: string) => void;
+  onForceDeleteNote: (noteId: string) => void;
   onJumpToText: (note: StudyNote) => void;
   onAskAINote: (note: StudyNote) => void;
 }) {
@@ -111,7 +123,8 @@ export function StudySidePanel({
             {activeTab === "ai" ? (
               <motion.div key="ai" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} transition={{ duration: 0.18, ease: "easeOut" }}>
                 <AIStudyAssistantPanel
-                  selectedText={selectedText}
+                  documentId={documentId}
+                  context={aiContext.source ? aiContext : { source: "selection", selectedText }}
                   initialQuestion={assistantInitialQuestion}
                   mode={aiMode}
                 />
@@ -120,11 +133,15 @@ export function StudySidePanel({
               <motion.div key="notes" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} transition={{ duration: 0.18, ease: "easeOut" }}>
                 <NotesPanel
                   notes={notes}
+                  deletedNotes={deletedNotes}
+                  focusedNoteId={focusedNoteId}
                   composerValue={noteComposerValue}
                   selectedTextContext={selectedNoteText}
                   onComposerChange={onNoteComposerChange}
                   onSaveNote={onSaveNote}
                   onDeleteNote={onDeleteNote}
+                  onRestoreNote={onRestoreNote}
+                  onForceDeleteNote={onForceDeleteNote}
                   onJumpToText={onJumpToText}
                   onAskAI={onAskAINote}
                 />

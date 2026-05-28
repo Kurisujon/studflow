@@ -7,11 +7,18 @@ declare module "lucide-react" {
 
   export const CheckCircle2: import("react").ComponentType<IconProps>;
   export const Eraser: import("react").ComponentType<IconProps>;
+  export const ExternalLink: import("react").ComponentType<IconProps>;
+  export const GripHorizontal: import("react").ComponentType<IconProps>;
   export const Highlighter: import("react").ComponentType<IconProps>;
+  export const Maximize2: import("react").ComponentType<IconProps>;
   export const MessageSquareText: import("react").ComponentType<IconProps>;
+  export const Minus: import("react").ComponentType<IconProps>;
   export const Redo2: import("react").ComponentType<IconProps>;
+  export const RotateCcw: import("react").ComponentType<IconProps>;
+  export const StickyNote: import("react").ComponentType<IconProps>;
   export const Underline: import("react").ComponentType<IconProps>;
   export const Undo2: import("react").ComponentType<IconProps>;
+  export const X: import("react").ComponentType<IconProps>;
 }
 
 declare module "@base-ui/react/button" {

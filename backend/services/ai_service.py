@@ -261,10 +261,29 @@ def explain_selection(
     *,
     highlighted_text: str,
     user_question: str = "",
+    note_content: str = "",
+    source: str = "selection",
 ) -> SelectionExplanation:
+    if source == "note" and note_content and highlighted_text:
+        context = (
+            "The user is studying a document.\n\n"
+            f"They selected or saved this text:\n{highlighted_text}\n\n"
+            f"Their note about it:\n{note_content}\n\n"
+            "Answer the user's question using this context. Keep the explanation clear, "
+            "student-friendly, and relevant to the study material."
+        )
+    elif source == "note" and note_content:
+        context = (
+            "The user is studying a document.\n\n"
+            f"They wrote this general note:\n{note_content}\n\n"
+            "Answer the user's question using this note and the document context."
+        )
+    else:
+        context = f"Highlighted study text:\n{highlighted_text}"
+
     prompt = (
         f"{EXPLAIN_SELECTION_PROMPT}\n\n"
-        f"Highlighted study text:\n{highlighted_text}\n\n"
+        f"{context}\n\n"
         f"Student follow-up question:\n{user_question or 'Explain this clearly in simpler terms.'}"
     )
     response = _generate_structured(

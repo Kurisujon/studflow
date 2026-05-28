@@ -11,6 +11,7 @@ class Settings(BaseSettings):
         env_file=BASE_DIR / ".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
+        extra="ignore",
     )
 
     # Application
@@ -54,6 +55,9 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 60 * 24  # 24 hours
 
     # Clerk Auth
+    clerk_secret_key: str = ""
+    clerk_publishable_key: str = ""
+    next_public_clerk_publishable_key: str = ""
     clerk_jwks_url: str = ""
     clerk_issuer: str = ""
     clerk_audience: str = ""

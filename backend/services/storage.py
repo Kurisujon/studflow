@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import mimetypes
 from pathlib import PurePosixPath
-from urllib.parse import urlparse
 
 from supabase import Client, create_client
 
 from core.config import settings
+
+# Default expiry for signed URLs: 5 minutes.
+SIGNED_URL_EXPIRES_IN_SECONDS = 300
 
 
 class StorageServiceError(Exception):
@@ -23,6 +25,7 @@ def get_supabase_client() -> Client:
 
 
 def build_storage_path(document_id: str, filename: str) -> str:
+    """Return the relative path used to store the file inside the bucket."""
     sanitized_name = PurePosixPath(filename).name.replace(" ", "-")
     return f"{settings.supabase_storage_folder}/{document_id}/{sanitized_name}"
 
@@ -33,6 +36,11 @@ def upload_file_to_storage(
     destination_path: str,
     content_type: str | None,
 ) -> str:
+    """Upload *content* to *destination_path* in the private bucket.
+
+    Returns the storage path (not a public URL) so the caller can persist it
+    and later generate short-lived signed URLs on demand.
+    """
     client = get_supabase_client()
     resolved_content_type, _ = mimetypes.guess_type(destination_path)
     upload_content_type = content_type or resolved_content_type or "application/octet-stream"
@@ -46,33 +54,45 @@ def upload_file_to_storage(
                 "upsert": "false",
             },
         )
-        public_url = client.storage.from_(settings.supabase_storage_bucket).get_public_url(
-            destination_path
-        )
     except Exception as exc:  # pragma: no cover - third-party client errors vary
         raise StorageServiceError("Failed to upload file to Supabase Storage.") from exc
 
-    if not public_url:
-        raise StorageServiceError("Supabase Storage did not return a public URL.")
-
-    return public_url
+    # Return the storage path — NOT a public URL.
+    return destination_path
 
 
-def extract_storage_path(file_url: str) -> str:
-    parsed_url = urlparse(file_url)
-    marker = f"/storage/v1/object/public/{settings.supabase_storage_bucket}/"
+def create_signed_url(
+    storage_path: str,
+    expires_in: int = SIGNED_URL_EXPIRES_IN_SECONDS,
+) -> str:
+    """Generate a short-lived signed URL for *storage_path*.
 
-    if marker not in parsed_url.path:
-        raise StorageServiceError(
-            "File URL does not match the configured Supabase public storage path."
-        )
-
-    return parsed_url.path.split(marker, maxsplit=1)[1]
-
-
-def download_file_from_storage(file_url: str) -> bytes:
+    The URL is only valid for *expires_in* seconds (default 5 minutes).
+    This must be called at request-time; never cache or persist the result.
+    """
     client = get_supabase_client()
-    storage_path = extract_storage_path(file_url)
+
+    try:
+        result = client.storage.from_(settings.supabase_storage_bucket).create_signed_url(
+            path=storage_path,
+            expires_in=expires_in,
+        )
+    except Exception as exc:  # pragma: no cover - third-party client errors vary
+        raise StorageServiceError("Failed to generate signed URL from Supabase Storage.") from exc
+
+    signed_url: str | None = (
+        result.get("signedURL") or result.get("signedUrl") if isinstance(result, dict) else None
+    )
+
+    if not signed_url:
+        raise StorageServiceError("Supabase Storage did not return a signed URL.")
+
+    return signed_url
+
+
+def download_file_from_storage(storage_path: str) -> bytes:
+    """Download a file by its *storage_path* from the private bucket."""
+    client = get_supabase_client()
 
     try:
         file_bytes = client.storage.from_(settings.supabase_storage_bucket).download(
@@ -87,9 +107,9 @@ def download_file_from_storage(file_url: str) -> bytes:
     return file_bytes
 
 
-def delete_file_from_storage(file_url: str) -> None:
+def delete_file_from_storage(storage_path: str) -> None:
+    """Delete a file by its *storage_path* from the private bucket."""
     client = get_supabase_client()
-    storage_path = extract_storage_path(file_url)
 
     try:
         client.storage.from_(settings.supabase_storage_bucket).remove([storage_path])

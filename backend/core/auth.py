@@ -1,3 +1,5 @@
+import base64
+import binascii
 import json
 import logging
 from typing import Any
@@ -17,14 +19,67 @@ class CurrentUser(BaseModel):
     clerk_user_id: str
     email: str | None = None
 
+
+def _derive_clerk_issuer_from_publishable_key() -> str | None:
+    publishable_key = (
+        settings.clerk_publishable_key
+        or settings.next_public_clerk_publishable_key
+    )
+    if not publishable_key:
+        return None
+
+    encoded_key = ""
+    for prefix in ("pk_test_", "pk_live_"):
+        if publishable_key.startswith(prefix):
+            encoded_key = publishable_key.removeprefix(prefix)
+            break
+
+    if not encoded_key:
+        return None
+
+    try:
+        padding = "=" * (-len(encoded_key) % 4)
+        decoded_key = base64.urlsafe_b64decode(
+            f"{encoded_key}{padding}"
+        ).decode("utf-8")
+    except (binascii.Error, UnicodeDecodeError):
+        logger.warning("Unable to derive Clerk issuer from publishable key.")
+        return None
+
+    issuer = decoded_key.rstrip("$").rstrip("/")
+    if not issuer:
+        return None
+
+    if issuer.startswith("https://"):
+        return issuer
+
+    return f"https://{issuer}"
+
+
+def get_clerk_issuer() -> str | None:
+    return settings.clerk_issuer.rstrip("/") or _derive_clerk_issuer_from_publishable_key()
+
+
+def get_clerk_jwks_url() -> str | None:
+    if settings.clerk_jwks_url:
+        return settings.clerk_jwks_url
+
+    issuer = get_clerk_issuer()
+    if issuer:
+        return f"{issuer}/.well-known/jwks.json"
+
+    return None
+
+
 def get_clerk_jwks() -> dict[str, Any]:
-    if not settings.clerk_jwks_url:
+    jwks_url = get_clerk_jwks_url()
+    if not jwks_url:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="CLERK_JWKS_URL is not configured",
+            detail="Clerk JWT verification is not configured",
         )
     try:
-        response = urlopen(settings.clerk_jwks_url)
+        response = urlopen(jwks_url, timeout=5)
         return json.loads(response.read())
     except Exception as e:
         logger.error(f"Failed to fetch Clerk JWKS: {e}")
@@ -35,6 +90,7 @@ def get_clerk_jwks() -> dict[str, Any]:
 
 def verify_clerk_token(token: str) -> dict[str, Any]:
     jwks = get_clerk_jwks()
+    clerk_issuer = get_clerk_issuer()
     
     try:
         unverified_header = jwt.get_unverified_header(token)
@@ -74,7 +130,7 @@ def verify_clerk_token(token: str) -> dict[str, Any]:
             rsa_key,
             algorithms=["RS256"],
             audience=settings.clerk_audience if settings.clerk_audience else None,
-            issuer=settings.clerk_issuer if settings.clerk_issuer else None,
+            issuer=clerk_issuer,
             options={"verify_aud": bool(settings.clerk_audience)}
         )
         return payload

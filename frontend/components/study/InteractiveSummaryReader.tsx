@@ -8,13 +8,29 @@ import { FloatingNotesButton } from "@/components/study/FloatingNotesButton";
 import { RelatedLearningVideos } from "@/components/study/RelatedLearningVideos";
 import { StudySidePanel } from "@/components/study/StudySidePanel";
 import { Button } from "@/components/ui/button";
-import { deleteAnnotation, saveAnnotation } from "@/lib/api/annotations";
+import { useAuth } from "@clerk/nextjs";
+import {
+  createAnnotation,
+  deleteAnnotation,
+  getAnnotations,
+  updateAnnotation,
+  type CreateAnnotationPayload,
+} from "@/lib/api/annotations";
+import {
+  createNote,
+  forceDeleteNote,
+  getNotes,
+  restoreNote,
+  softDeleteNote,
+} from "@/lib/api/notes";
 import type { StudyDocument } from "@/lib/types";
 import type {
   AIToolMode,
   Annotation,
   AnnotationColor,
+  AnnotationType,
   SelectionState,
+  StudyAIContext,
   StudyBubbleTab,
   StudyNote,
   TextSelectionPayload,
@@ -23,8 +39,6 @@ import type {
 
 type SummaryData = NonNullable<StudyDocument["summary_data"]>;
 
-const STORAGE_KEY_PREFIX = "distill-summary-annotations-v4";
-
 const HIGHLIGHT_COLORS: AnnotationColor[] = [
   "blue",
   "yellow",
@@ -32,10 +46,6 @@ const HIGHLIGHT_COLORS: AnnotationColor[] = [
   "pink",
   "purple",
 ];
-
-function storageKey(documentId: string) {
-  return `${STORAGE_KEY_PREFIX}:${documentId}`;
-}
 
 function formatTerm(term: string) {
   const separator = term.includes(":") ? ":" : term.includes(" - ") ? " - " : null;
@@ -68,6 +78,60 @@ function makeAnnotation(
   };
 }
 
+function getTopicIndexFromBlockId(blockId: string) {
+  const [, topicIndex] = blockId.split("-");
+  const parsed = Number.parseInt(topicIndex ?? "", 10);
+  return Number.isNaN(parsed) ? undefined : parsed;
+}
+
+function annotationToNote(annotation: Annotation): StudyNote {
+  return {
+    id: annotation.id,
+    annotationId: annotation.id,
+    documentId: annotation.documentId,
+    topicIndex: getTopicIndexFromBlockId(annotation.blockId),
+    blockId: annotation.blockId,
+    startOffset: annotation.startOffset,
+    endOffset: annotation.endOffset,
+    selectedText: annotation.selectedText || undefined,
+    content: annotation.noteContent ?? "",
+    deletedAt: annotation.deletedAt ?? null,
+    createdAt: annotation.createdAt,
+    updatedAt: annotation.updatedAt,
+  };
+}
+
+function annotationPayload(annotation: Annotation): CreateAnnotationPayload {
+  return {
+    blockId: annotation.blockId,
+    selectedText: annotation.selectedText,
+    startOffset: annotation.startOffset,
+    endOffset: annotation.endOffset,
+    type: annotation.type,
+    color: annotation.color,
+    underlineColor: annotation.underlineColor,
+    noteContent: annotation.noteContent,
+  };
+}
+
+function rangesOverlap(
+  first: Pick<Annotation, "startOffset" | "endOffset">,
+  second: Pick<Annotation, "startOffset" | "endOffset">,
+) {
+  return first.startOffset < second.endOffset && first.endOffset > second.startOffset;
+}
+
+function getOverlapLength(
+  first: Pick<Annotation, "startOffset" | "endOffset">,
+  second: Pick<SelectionState, "startOffset" | "endOffset">,
+) {
+  return Math.max(
+    0,
+    Math.min(first.endOffset, second.endOffset) -
+      Math.max(first.startOffset, second.startOffset),
+  );
+}
+
 export function InteractiveSummaryReader({
   documentId,
   summary,
@@ -85,13 +149,22 @@ export function InteractiveSummaryReader({
   const [assistantInitialQuestion, setAssistantInitialQuestion] = useState("");
   const [aiMode, setAiMode] = useState<AIToolMode>("ask-ai");
   const [aiContextText, setAiContextText] = useState("");
+  const [aiContext, setAiContext] = useState<StudyAIContext>({
+    source: "selection",
+    selectedText: "",
+  });
   const [activeHighlightColor] = useState<AnnotationColor>("blue");
   const [underlineColorMode, setUnderlineColorMode] = useState(false);
   const [noteComposerValue, setNoteComposerValue] = useState("");
   const [noteContextText, setNoteContextText] = useState("");
+  const [deletedNotes, setDeletedNotes] = useState<StudyNote[]>([]);
+  const [focusedNoteId, setFocusedNoteId] = useState<string | null>(null);
   const [pulseAnnotationId, setPulseAnnotationId] = useState<string | null>(null);
+  const [annotationError, setAnnotationError] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const selectionPopoverRef = useRef<HTMLDivElement | null>(null);
+
+  const { getToken, isLoaded, isSignedIn } = useAuth();
 
   function handleTextSelection(payload: TextSelectionPayload) {
     const state: SelectionState = {
@@ -107,19 +180,53 @@ export function InteractiveSummaryReader({
   }
 
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(storageKey(documentId));
-      if (raw) {
-        setAnnotations(JSON.parse(raw) as Annotation[]);
-      }
-    } catch {
-      setAnnotations([]);
-    }
-  }, [documentId]);
+    let mounted = true;
 
-  useEffect(() => {
-    window.localStorage.setItem(storageKey(documentId), JSON.stringify(annotations));
-  }, [annotations, documentId]);
+    if (!isLoaded) {
+      return () => {
+        mounted = false;
+      };
+    }
+
+    if (!isSignedIn) {
+      return () => {
+        mounted = false;
+      };
+    }
+
+    getToken({ skipCache: true })
+      .then((token) => {
+        if (!mounted) return;
+        if (!token) {
+          throw new Error("Missing Clerk session token.");
+        }
+
+        return Promise.all([
+          getAnnotations(documentId, token),
+          getNotes(documentId, token, true),
+        ]);
+      })
+      .then((result) => {
+        if (!mounted || !result) return;
+
+        const [annotationData, noteData] = result;
+        setAnnotations(annotationData);
+        const allNotes = noteData.map(annotationToNote);
+        setNotes(allNotes.filter((note) => !note.deletedAt));
+        setDeletedNotes(allNotes.filter((note) => Boolean(note.deletedAt)));
+        setAnnotationError(null);
+      })
+      .catch((error) => {
+        console.error(error);
+        if (mounted) {
+          setAnnotationError("Saved annotations could not be loaded.");
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [documentId, getToken, isLoaded, isSignedIn]);
 
   useEffect(() => {
     function handleDocumentPointerDown(event: PointerEvent) {
@@ -185,9 +292,12 @@ export function InteractiveSummaryReader({
     return <p>No summary available yet.</p>;
   }
 
+  const activeSummary = summary;
   const sections = summary.detailed_sections;
   const activeSection = sections[activeIndex];
   const progress = ((activeIndex + 1) / sections.length) * 100;
+  const overviewBlockId = "overview";
+  const titleBlockId = `topic-${activeIndex}-title`;
   const pendingSelectionForBlock = (blockId: string) =>
     pendingSelection?.blockId === blockId
       ? {
@@ -198,10 +308,10 @@ export function InteractiveSummaryReader({
 
   const topicAnnotations = annotations.filter((annotation) => {
     return (
-      annotation.blockId === `overview-${activeIndex}` ||
-      annotation.blockId === `title-${activeIndex}` ||
-      annotation.blockId.startsWith(`point-${activeIndex}-`) ||
-      annotation.blockId.startsWith(`term-${activeIndex}-`)
+      annotation.blockId === overviewBlockId ||
+      annotation.blockId === titleBlockId ||
+      annotation.blockId.startsWith(`topic-${activeIndex}-keypoint-`) ||
+      annotation.blockId.startsWith(`topic-${activeIndex}-term-`)
     );
   });
 
@@ -211,6 +321,40 @@ export function InteractiveSummaryReader({
     setAnnotations(next);
   }
 
+  function getPlainTextForBlock(blockId: string) {
+    if (blockId === overviewBlockId) {
+      return activeSummary.overall_overview;
+    }
+
+    if (blockId === titleBlockId) {
+      return activeSection.topic_title;
+    }
+
+    const pointMatch = blockId.match(/^topic-(\d+)-keypoint-(\d+)$/);
+    if (pointMatch) {
+      const [, topicIndex, pointIndex] = pointMatch;
+      return sections[Number(topicIndex)]?.key_points[Number(pointIndex)] ?? null;
+    }
+
+    const termMatch = blockId.match(/^topic-(\d+)-term-(\d+)$/);
+    if (termMatch) {
+      const [, topicIndex, termIndex] = termMatch;
+      const term = sections[Number(topicIndex)]?.important_terms_and_definitions[Number(termIndex)];
+      if (!term) return null;
+      const formatted = formatTerm(term);
+      return formatted.definition ? `${formatted.label}: ${formatted.definition}` : formatted.label;
+    }
+
+    return null;
+  }
+
+  function isValidSelection(selection: SelectionState) {
+    const blockText = getPlainTextForBlock(selection.blockId);
+    if (!blockText) return false;
+
+    return blockText.slice(selection.startOffset, selection.endOffset) === selection.selectedText;
+  }
+
   function clearPendingSelection() {
     window.getSelection()?.removeAllRanges();
     setSelectionState(null);
@@ -218,106 +362,179 @@ export function InteractiveSummaryReader({
     setUnderlineColorMode(false);
   }
 
-  function saveHighlight(color: AnnotationColor) {
+  function findBestOverlappingAnnotation(type: AnnotationType, selection: SelectionState) {
+    return annotations.filter(
+      (annotation) =>
+        annotation.type === type &&
+        annotation.blockId === selection.blockId &&
+        rangesOverlap(annotation, selection),
+    ).sort(
+      (first, second) =>
+        getOverlapLength(second, selection) - getOverlapLength(first, selection),
+    )[0];
+  }
+
+  function saveRangeAnnotation(type: "highlight", color: AnnotationColor): void;
+  function saveRangeAnnotation(type: "underline", color: UnderlineColor): void;
+  function saveRangeAnnotation(type: "highlight" | "underline", color: AnnotationColor | UnderlineColor) {
     if (!pendingSelection) return;
 
-    const existing = annotations.find(
-      (annotation) =>
-        annotation.type === "highlight" &&
-        annotation.blockId === pendingSelection.blockId &&
-        annotation.startOffset === pendingSelection.startOffset &&
-        annotation.endOffset === pendingSelection.endOffset,
-    );
-
-    if (existing && existing.color === color) {
-      commit(annotations.filter((annotation) => annotation.id !== existing.id));
-      void deleteAnnotation(existing.id);
+    if (!isValidSelection(pendingSelection)) {
+      console.warn("Annotation offset mismatch", {
+        blockId: pendingSelection.blockId,
+        selectedText: pendingSelection.selectedText,
+        startOffset: pendingSelection.startOffset,
+        endOffset: pendingSelection.endOffset,
+      });
+      setAnnotationError("Selection could not be saved. Try selecting the text again.");
       clearPendingSelection();
       return;
     }
 
-    const created = makeAnnotation(documentId, pendingSelection, "highlight", color);
-    commit([
-      ...annotations.filter(
-        (annotation) =>
-          !(
-            annotation.type === "highlight" &&
-            annotation.blockId === pendingSelection.blockId &&
-            annotation.startOffset === pendingSelection.startOffset &&
-            annotation.endOffset === pendingSelection.endOffset
+    const annotationToUpdate = findBestOverlappingAnnotation(type, pendingSelection);
+    const updateHasSameColor =
+      type === "highlight"
+        ? annotationToUpdate?.color === color
+        : annotationToUpdate?.underlineColor === color;
+
+    if (annotationToUpdate && updateHasSameColor) {
+      const previousAnnotations = annotations;
+      setAnnotations((current) =>
+        current.filter((annotation) => annotation.id !== annotationToUpdate.id),
+      );
+
+      void getToken({ skipCache: true })
+        .then((token) => deleteAnnotation(annotationToUpdate.id, token))
+        .then(() => {
+          setAnnotationError(null);
+        })
+        .catch((error) => {
+          console.error(error);
+          setAnnotations(previousAnnotations);
+          setAnnotationError(`${type === "highlight" ? "Highlight" : "Underline"} could not be removed.`);
+        });
+
+      clearPendingSelection();
+      return;
+    }
+
+    if (annotationToUpdate) {
+      const previousAnnotations = annotations;
+      const optimistic =
+        type === "highlight"
+          ? { ...annotationToUpdate, color: color as AnnotationColor, updatedAt: new Date().toISOString() }
+          : { ...annotationToUpdate, underlineColor: color as UnderlineColor, updatedAt: new Date().toISOString() };
+      setAnnotations((current) =>
+        current.map((annotation) =>
+          annotation.id === annotationToUpdate.id ? optimistic : annotation,
+        ),
+      );
+      void getToken({ skipCache: true })
+        .then((token) =>
+          updateAnnotation(
+            annotationToUpdate.id,
+            type === "highlight"
+              ? { color: color as AnnotationColor }
+              : { underlineColor: color as UnderlineColor },
+            token,
           ),
-      ),
-      created,
-    ]);
-    void saveAnnotation(created);
+        )
+        .then((saved) => {
+          setAnnotations((current) =>
+            current.map((annotation) =>
+              annotation.id === annotationToUpdate.id ? saved : annotation,
+            ),
+          );
+          setAnnotationError(null);
+        })
+        .catch((error) => {
+          console.error(error);
+          setAnnotations(previousAnnotations);
+          setAnnotationError(`${type === "highlight" ? "Highlight" : "Underline"} could not be saved.`);
+        });
+      clearPendingSelection();
+      return;
+    }
+
+    const created = makeAnnotation(documentId, pendingSelection, type, color);
+    const previousAnnotations = annotations;
+    commit([...annotations, created]);
+
+    void getToken({ skipCache: true })
+      .then((token) => createAnnotation(documentId, annotationPayload(created), token))
+      .then((saved) => {
+        setAnnotations((current) =>
+          current.map((annotation) => annotation.id === created.id ? saved : annotation),
+        );
+        setAnnotationError(null);
+      })
+      .catch((error) => {
+        console.error(error);
+        setAnnotations(previousAnnotations);
+        setAnnotationError(`${type === "highlight" ? "Highlight" : "Underline"} could not be saved.`);
+      });
+
     clearPendingSelection();
   }
 
+  function saveHighlight(color: AnnotationColor) {
+    saveRangeAnnotation("highlight", color);
+  }
+
   function saveUnderline(color: UnderlineColor) {
-    if (!pendingSelection) return;
-
-    const existing = annotations.find(
-      (annotation) =>
-        annotation.type === "underline" &&
-        annotation.blockId === pendingSelection.blockId &&
-        annotation.startOffset === pendingSelection.startOffset &&
-        annotation.endOffset === pendingSelection.endOffset,
-    );
-
-    if (existing && existing.underlineColor === color) {
-      commit(annotations.filter((annotation) => annotation.id !== existing.id));
-      void deleteAnnotation(existing.id);
-      clearPendingSelection();
-      return;
-    }
-
-    const created = makeAnnotation(documentId, pendingSelection, "underline", color);
-    commit([
-      ...annotations.filter(
-        (annotation) =>
-          !(
-            annotation.type === "underline" &&
-            annotation.blockId === pendingSelection.blockId &&
-            annotation.startOffset === pendingSelection.startOffset &&
-            annotation.endOffset === pendingSelection.endOffset
-          ),
-      ),
-      created,
-    ]);
-    void saveAnnotation(created);
-    clearPendingSelection();
+    saveRangeAnnotation("underline", color);
   }
 
   function saveNote() {
     if (!noteComposerValue.trim()) return;
 
-    const now = new Date().toISOString();
     const selected = selectionState ?? pendingSelection;
-    const note: StudyNote = {
-      id: crypto.randomUUID(),
-      annotationId: selected ? crypto.randomUUID() : undefined,
-      documentId,
-      topicIndex: activeIndex,
-      selectedText: selected?.selectedText,
-      content: noteComposerValue.trim(),
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    setNotes((current) => [...current, note]);
-
-    if (selected) {
-      const noteAnnotation = makeAnnotation(
+    const noteAnnotation = selected
+      ? makeAnnotation(
         documentId,
         selected,
         "note",
         undefined,
-        note.content,
+        noteComposerValue.trim(),
+      )
+      : makeAnnotation(
+        documentId,
+        {
+          blockId: `topic-${activeIndex}-general-note`,
+          selectedText: "",
+          startOffset: 0,
+          endOffset: 0,
+          x: 0,
+          y: 0,
+        },
+        "note",
+        undefined,
+        noteComposerValue.trim(),
       );
-      noteAnnotation.id = note.annotationId ?? noteAnnotation.id;
-      commit([...annotations, noteAnnotation]);
-      void saveAnnotation(noteAnnotation);
-    }
+    const optimisticNote = annotationToNote(noteAnnotation);
+    const previousAnnotations = annotations;
+    const previousNotes = notes;
+
+    setAnnotations((current) => [...current, noteAnnotation]);
+    setNotes((current) => [...current, optimisticNote]);
+
+    void getToken({ skipCache: true })
+      .then((token) => createNote(documentId, annotationPayload(noteAnnotation), token))
+      .then((saved) => {
+        setAnnotations((current) =>
+          current.map((annotation) => annotation.id === noteAnnotation.id ? saved : annotation),
+        );
+        setNotes((current) =>
+          current.map((note) => note.id === optimisticNote.id ? annotationToNote(saved) : note),
+        );
+        setAnnotationError(null);
+      })
+      .catch((error) => {
+        console.error(error);
+        setAnnotations(previousAnnotations);
+        setNotes(previousNotes);
+        setAnnotationError("Note could not be saved.");
+      });
 
     setNoteComposerValue("");
     setNoteContextText("");
@@ -326,26 +543,105 @@ export function InteractiveSummaryReader({
 
   function deleteNote(noteId: string) {
     const note = notes.find((item) => item.id === noteId);
+    if (!note) return;
+
+    const previousAnnotations = annotations;
+    const previousNotes = notes;
+    const previousDeletedNotes = deletedNotes;
+    const deletedAt = new Date().toISOString();
+    const deletedNote = { ...note, deletedAt, updatedAt: deletedAt };
     setNotes((current) => current.filter((item) => item.id !== noteId));
+    setDeletedNotes((current) => [deletedNote, ...current]);
     if (note?.annotationId) {
       commit(annotations.filter((annotation) => annotation.id !== note.annotationId));
-      void deleteAnnotation(note.annotationId);
+      void getToken({ skipCache: true })
+        .then((token) => softDeleteNote(note.annotationId!, token))
+        .catch((error) => {
+          console.error(error);
+          setAnnotations(previousAnnotations);
+          setNotes(previousNotes);
+          setDeletedNotes(previousDeletedNotes);
+          setAnnotationError("Note could not be deleted.");
+        });
     }
   }
 
+  function restoreDeletedNote(noteId: string) {
+    const note = deletedNotes.find((item) => item.id === noteId);
+    if (!note?.annotationId) return;
+
+    const previousAnnotations = annotations;
+    const previousNotes = notes;
+    const previousDeletedNotes = deletedNotes;
+    setDeletedNotes((current) => current.filter((item) => item.id !== noteId));
+
+    void getToken({ skipCache: true })
+      .then((token) => restoreNote(note.annotationId!, token))
+      .then((restored) => {
+        const restoredNote = annotationToNote(restored);
+        setNotes((current) => [restoredNote, ...current]);
+        if (restored.selectedText) {
+          setAnnotations((current) => [...current.filter((item) => item.id !== restored.id), restored]);
+        }
+        setAnnotationError(null);
+      })
+      .catch((error) => {
+        console.error(error);
+        setAnnotations(previousAnnotations);
+        setNotes(previousNotes);
+        setDeletedNotes(previousDeletedNotes);
+        setAnnotationError("Note could not be restored.");
+      });
+  }
+
+  function permanentlyDeleteNote(noteId: string) {
+    const note = deletedNotes.find((item) => item.id === noteId);
+    if (!note?.annotationId) return;
+
+    const previousDeletedNotes = deletedNotes;
+    setDeletedNotes((current) => current.filter((item) => item.id !== noteId));
+
+    void getToken({ skipCache: true })
+      .then((token) => forceDeleteNote(note.annotationId!, token))
+      .catch((error) => {
+        console.error(error);
+        setDeletedNotes(previousDeletedNotes);
+        setAnnotationError("Note could not be permanently deleted.");
+      });
+  }
+
   function jumpToText(note: StudyNote) {
-    if (!note.annotationId) return;
+    if (!note.annotationId || !note.selectedText) return;
     const element = rootRef.current?.querySelector<HTMLElement>(
       `[data-annotation-id="${note.annotationId}"]`,
     );
     if (!element) return;
     element.scrollIntoView({ behavior: "smooth", block: "center" });
+    setDrawerOpen(true);
+    setActiveBubbleTab("notes");
+    setFocusedNoteId(note.id);
     setPulseAnnotationId(note.annotationId);
-    window.setTimeout(() => setPulseAnnotationId(null), 1200);
+    window.setTimeout(() => {
+      setPulseAnnotationId(null);
+      setFocusedNoteId(null);
+    }, 1200);
+  }
+
+  function handleNoteMarkerClick(annotationId: string) {
+    const note = notes.find((item) => item.annotationId === annotationId);
+    if (!note) return;
+    setDrawerOpen(true);
+    setActiveBubbleTab("notes");
+    setFocusedNoteId(note.id);
+    setPulseAnnotationId(annotationId);
+    window.setTimeout(() => {
+      setPulseAnnotationId(null);
+      setFocusedNoteId(null);
+    }, 1200);
   }
 
   function renderPoint(point: string, index: number) {
-    const blockId = `point-${activeIndex}-${index}`;
+    const blockId = `topic-${activeIndex}-keypoint-${index}`;
     const blockAnnotations = topicAnnotations.filter((annotation) => annotation.blockId === blockId);
     const pulse = blockAnnotations.some((annotation) => annotation.id === pulseAnnotationId);
     return (
@@ -358,12 +654,13 @@ export function InteractiveSummaryReader({
         pendingSelection={pendingSelectionForBlock(blockId)}
         pulse={pulse}
         onSelection={handleTextSelection}
+        onNoteClick={handleNoteMarkerClick}
       />
     );
   }
 
   function renderTerm(term: string, index: number) {
-    const blockId = `term-${activeIndex}-${index}`;
+    const blockId = `topic-${activeIndex}-term-${index}`;
     const blockAnnotations = topicAnnotations.filter((annotation) => annotation.blockId === blockId);
     const pulse = blockAnnotations.some((annotation) => annotation.id === pulseAnnotationId);
     const formatted = formatTerm(term);
@@ -379,6 +676,7 @@ export function InteractiveSummaryReader({
         pulse={pulse}
         termLabelEnd={formatted.label.length}
         onSelection={handleTextSelection}
+        onNoteClick={handleNoteMarkerClick}
       />
     );
   }
@@ -395,6 +693,10 @@ export function InteractiveSummaryReader({
     if (!pendingSelection) return;
     setSelectionState(pendingSelection);
     setAiContextText(pendingSelection.selectedText);
+    setAiContext({
+      source: "selection",
+      selectedText: pendingSelection.selectedText,
+    });
     setDrawerOpen(true);
     setActiveBubbleTab("ai");
     setAiMode(mode);
@@ -415,12 +717,14 @@ export function InteractiveSummaryReader({
         setPendingSelection(null);
         setNoteContextText("");
         setAiContextText("");
+        setAiContext({ source: "selection", selectedText: "" });
         setNoteComposerValue("");
       } else {
         setSelectionState(null);
         setPendingSelection(null);
         setNoteContextText("");
         setAiContextText("");
+        setAiContext({ source: "selection", selectedText: "" });
         setNoteComposerValue("");
       }
       return next;
@@ -457,13 +761,14 @@ export function InteractiveSummaryReader({
             </p>
             <AnnotatableTextBlock
               as="p"
-              blockId={`overview-${activeIndex}`}
+              blockId={overviewBlockId}
               text={summary.overall_overview}
               annotations={topicAnnotations.filter(
-                (annotation) => annotation.blockId === `overview-${activeIndex}`,
+                (annotation) => annotation.blockId === overviewBlockId,
               )}
-              pendingSelection={pendingSelectionForBlock(`overview-${activeIndex}`)}
+              pendingSelection={pendingSelectionForBlock(overviewBlockId)}
               onSelection={handleTextSelection}
+              onNoteClick={handleNoteMarkerClick}
               style={{
                 fontFamily: '"Geist", "Inter", "Segoe UI", "Helvetica Neue", Arial, sans-serif',
                 fontSize: "1.05rem",
@@ -474,6 +779,18 @@ export function InteractiveSummaryReader({
           </div>
           
           <RelatedLearningVideos documentId={documentId} />
+
+          {annotationError ? (
+            <p
+              style={{
+                color: "#b42318",
+                fontSize: "0.88rem",
+                marginTop: "-0.4rem",
+              }}
+            >
+              {annotationError}
+            </p>
+          ) : null}
 
           <div
             style={{
@@ -541,13 +858,14 @@ export function InteractiveSummaryReader({
           </p>
           <AnnotatableTextBlock
             as="h2"
-            blockId={`title-${activeIndex}`}
+            blockId={titleBlockId}
             text={activeSection.topic_title}
             annotations={topicAnnotations.filter(
-              (annotation) => annotation.blockId === `title-${activeIndex}`,
+              (annotation) => annotation.blockId === titleBlockId,
             )}
-            pendingSelection={pendingSelectionForBlock(`title-${activeIndex}`)}
+            pendingSelection={pendingSelectionForBlock(titleBlockId)}
             onSelection={handleTextSelection}
+            onNoteClick={handleNoteMarkerClick}
             style={{
               fontFamily: '"Geist", "Inter", "Segoe UI", "Helvetica Neue", Arial, sans-serif',
               fontSize: "clamp(2rem, 4vw, 3rem)",
@@ -705,7 +1023,7 @@ export function InteractiveSummaryReader({
                     ? Math.min(Math.max(pendingSelection.x, 220), window.innerWidth - 220)
                     : pendingSelection.x,
                 transform: "translateX(-50%)",
-                zIndex: 100,
+                zIndex: 110,
                 display: "flex",
                 alignItems: "center",
                 gap: "0.45rem",
@@ -833,25 +1151,44 @@ export function InteractiveSummaryReader({
 
       <StudySidePanel
         open={drawerOpen}
+        documentId={documentId}
         activeTab={activeBubbleTab}
         onTabChange={setActiveBubbleTab}
         selectedText={aiContextText || selectionState?.selectedText || pendingSelection?.selectedText || ""}
+        aiContext={
+          aiContext.selectedText || aiContext.noteContent
+            ? aiContext
+            : {
+                source: "selection",
+                selectedText: aiContextText || selectionState?.selectedText || pendingSelection?.selectedText || "",
+              }
+        }
         assistantInitialQuestion={assistantInitialQuestion}
         aiMode={aiMode}
         notes={topicNotes}
+        deletedNotes={deletedNotes}
+        focusedNoteId={focusedNoteId}
         noteComposerValue={noteComposerValue}
         selectedNoteText={noteContextText || selectionState?.selectedText || pendingSelection?.selectedText || ""}
         onNoteComposerChange={setNoteComposerValue}
         onSaveNote={saveNote}
         onDeleteNote={deleteNote}
+        onRestoreNote={restoreDeletedNote}
+        onForceDeleteNote={permanentlyDeleteNote}
         onJumpToText={jumpToText}
         onAskAINote={(note) => {
           setDrawerOpen(true);
           setActiveBubbleTab("ai");
           setAiMode("ask-ai");
-          setAiContextText(note.selectedText ?? "");
+          setAssistantInitialQuestion("");
+          setAiContextText(note.selectedText ?? note.content);
+          setAiContext({
+            source: "note",
+            selectedText: note.selectedText ?? note.content,
+            noteContent: note.content,
+          });
           setSelectionState(
-            note.annotationId
+            note.annotationId && note.selectedText
               ? (() => {
                   const annotation = annotations.find((item) => item.id === note.annotationId);
                   return annotation
