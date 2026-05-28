@@ -29,7 +29,7 @@ export default async function StudyPage({
         minHeight: "calc(100dvh - var(--nav-height))",
         padding: "2rem 1.5rem 3rem",
         background:
-          "radial-gradient(circle at top left, rgba(251,191,36,0.18), transparent 22%), radial-gradient(circle at top right, rgba(249,115,22,0.12), transparent 18%), linear-gradient(180deg, #fffaf3, #fffdf8)",
+          "radial-gradient(circle at top left, var(--theme-shadow), transparent 24%), radial-gradient(circle at top right, color-mix(in srgb, var(--theme-primary) 10%, transparent), transparent 20%), linear-gradient(180deg, var(--background), var(--theme-soft))",
       }}
     >
       <div className="container">
@@ -48,14 +48,14 @@ export default async function StudyPage({
                 fontSize: "0.75rem",
                 letterSpacing: "0.08em",
                 textTransform: "uppercase",
-                color: "#c2410c",
+                color: "var(--theme-primary)",
                 marginBottom: "0.5rem",
               }}
             >
               Study View
             </p>
             <h1 style={{ marginBottom: "0.35rem" }}>{document.filename}</h1>
-            <p style={{ color: "#7c2d12" }}>Status: {document.status}</p>
+            <p style={{ color: "var(--muted-foreground)" }}>Status: {document.status}</p>
           </div>
         </div>
 
@@ -82,8 +82,9 @@ export default async function StudyPage({
                 minHeight: "42px",
                 paddingInline: "18px",
                 borderRadius: "999px",
-                color: tab === item.key ? "#ffffff" : "#2f1c0f",
-                backgroundColor: tab === item.key ? "#111110" : "rgba(255,255,255,0.86)",
+                color: tab === item.key ? "var(--theme-on-primary)" : "var(--foreground)",
+                backgroundColor: tab === item.key ? "var(--theme-primary)" : "var(--card)",
+                border: tab === item.key ? "1px solid var(--theme-primary)" : "1px solid var(--border)",
               }}
             >
               {item.label}
@@ -94,11 +95,10 @@ export default async function StudyPage({
         <div
           style={{
             padding: "2rem",
-            border: "1px solid rgba(251, 146, 60, 0.16)",
+            border: "1px solid var(--theme-border)",
             borderRadius: "28px",
-            background:
-              "linear-gradient(180deg, rgba(255,255,255,0.95), rgba(255,250,240,0.96))",
-            boxShadow: "0 22px 60px rgba(249,115,22,0.08)",
+            background: "color-mix(in srgb, var(--card) 92%, var(--theme-soft))",
+            boxShadow: "0 22px 60px var(--theme-shadow)",
           }}
         >
           {tab === "flashcards" ? (

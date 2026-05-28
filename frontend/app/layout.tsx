@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Navbar } from "@/components/navbar";
+import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { Geist } from "next/font/google";
 import { cn } from "@/lib/utils";
 import { ClerkProvider } from "@clerk/nextjs";
@@ -24,17 +25,24 @@ export default function RootLayout({
 }) {
   return (
     <ClerkProvider>
-      <html lang="en" className={cn("font-sans", geist.variable)}>
+      <html
+        lang="en"
+        className={cn("font-sans", geist.variable)}
+        data-theme-color="system"
+        suppressHydrationWarning
+      >
         <body>
-          <Navbar />
-          <main
-            style={{
-              minHeight: "calc(100dvh - var(--nav-height))",
-              paddingTop: "var(--nav-height)",
-            }}
-          >
-            {children}
-          </main>
+          <ThemeProvider>
+            <Navbar />
+            <main
+              style={{
+                minHeight: "calc(100dvh - var(--nav-height))",
+                paddingTop: "var(--nav-height)",
+              }}
+            >
+              {children}
+            </main>
+          </ThemeProvider>
         </body>
       </html>
     </ClerkProvider>

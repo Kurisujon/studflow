@@ -114,6 +114,8 @@ export default function UploadPage() {
           alignItems: "center",
           justifyContent: "center",
           padding: "2rem 1.5rem",
+          background:
+            "radial-gradient(circle at top left, var(--theme-shadow), transparent 24%), linear-gradient(180deg, var(--background), color-mix(in srgb, var(--background) 82%, var(--theme-soft)))",
         }}
       >
         <DocumentProcessingStatus status={statusData} />
@@ -129,6 +131,8 @@ export default function UploadPage() {
         alignItems: "center",
         justifyContent: "center",
         padding: "2rem 1.5rem",
+        background:
+          "radial-gradient(circle at top left, var(--theme-shadow), transparent 24%), linear-gradient(180deg, var(--background), color-mix(in srgb, var(--background) 82%, var(--theme-soft)))",
       }}
     >
       <form
@@ -136,12 +140,11 @@ export default function UploadPage() {
         style={{
           width: "100%",
           maxWidth: "640px",
-          border: "1px solid var(--distill-border)",
+          border: "1px solid var(--theme-border)",
           borderRadius: "24px",
           padding: "2rem",
-          background:
-            "linear-gradient(180deg, rgba(255,255,255,0.92), rgba(249,249,248,0.96))",
-          boxShadow: "0 22px 64px rgba(17,17,16,0.06)",
+          background: "color-mix(in srgb, var(--card) 92%, var(--theme-soft))",
+          boxShadow: "0 22px 64px var(--theme-shadow)",
         }}
       >
         <p
@@ -149,7 +152,7 @@ export default function UploadPage() {
             fontSize: "0.75rem",
             letterSpacing: "0.08em",
             textTransform: "uppercase",
-            color: "var(--distill-text-muted)",
+            color: "var(--theme-primary)",
             marginBottom: "0.75rem",
           }}
         >
@@ -178,8 +181,8 @@ export default function UploadPage() {
             display: "block",
             padding: "1.5rem",
             borderRadius: "20px",
-            border: "1px dashed var(--distill-border)",
-            backgroundColor: "rgba(255,255,255,0.7)",
+            border: "1px dashed var(--theme-border)",
+            backgroundColor: "var(--card)",
             marginBottom: "1rem",
           }}
         >

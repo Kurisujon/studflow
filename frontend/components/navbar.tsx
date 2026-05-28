@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UserButton, useUser } from "@clerk/nextjs";
 
+import { ThemeSettings } from "@/components/theme/ThemeSettings";
+
 const NAV_LINKS = [
   { label: "Dashboard", href: "/dashboard" },
   { label: "Upload", href: "/upload" },
@@ -21,10 +23,10 @@ export function Navbar() {
         left: 0,
         right: 0,
         height: "var(--nav-height)",
-        backgroundColor: "rgba(249, 249, 248, 0.85)",
+        backgroundColor: "color-mix(in srgb, var(--background) 86%, transparent)",
         backdropFilter: "blur(12px)",
         WebkitBackdropFilter: "blur(12px)",
-        borderBottom: "1px solid var(--distill-border)",
+        borderBottom: "1px solid var(--border)",
         zIndex: 50,
         display: "flex",
         alignItems: "center",
@@ -71,9 +73,9 @@ export function Navbar() {
                     fontSize: "0.875rem",
                     fontWeight: 500,
                     color: isActive
-                      ? "var(--distill-text-primary)"
+                      ? "var(--theme-primary)"
                       : "var(--distill-text-secondary)",
-                    backgroundColor: isActive ? "var(--distill-border)" : "transparent",
+                    backgroundColor: isActive ? "var(--theme-soft)" : "transparent",
                     transition: "color var(--transition-fast), background-color var(--transition-fast)",
                   }}
                 >
@@ -81,7 +83,8 @@ export function Navbar() {
                 </Link>
               );
             })}
-            <div style={{ marginLeft: "0.75rem", display: "flex", alignItems: "center" }}>
+            <div style={{ marginLeft: "0.75rem", display: "flex", alignItems: "center", gap: "0.65rem" }}>
+              <ThemeSettings />
               <UserButton />
             </div>
             </>
@@ -108,6 +111,7 @@ export function Navbar() {
             >
               Get Started
             </Link>
+            <ThemeSettings />
             </>
           ) : null}
         </nav>

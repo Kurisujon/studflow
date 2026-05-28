@@ -220,22 +220,22 @@ export function FloatingVideoPlayer({
       >
         {isMinimized ? (
           <div
-            className="flex cursor-grab items-center gap-3 rounded-2xl border border-neutral-200 bg-white px-4 py-3 shadow-2xl shadow-black/15 active:cursor-grabbing"
+            className="flex cursor-grab items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 shadow-2xl shadow-black/15 active:cursor-grabbing"
             onPointerDown={(event) => dragControls.start(event)}
           >
             <GripHorizontal className="h-4 w-4 shrink-0 text-neutral-400" />
             <div className="min-w-0 flex-1 pr-1">
-              <p className="line-clamp-1 text-sm font-semibold leading-5 text-neutral-900">
+              <p className="line-clamp-1 text-sm font-semibold leading-5 text-foreground">
                 {video.title}
               </p>
-              <p className="line-clamp-1 text-xs leading-4 text-neutral-500">
+              <p className="line-clamp-1 text-xs leading-4 text-muted-foreground">
                 {video.channelTitle}
               </p>
             </div>
             <button
               type="button"
               aria-label="Restore video player"
-              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-900"
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
               onPointerDown={stopDragStart}
               onClick={() => setIsMinimized(false)}
             >
@@ -244,7 +244,7 @@ export function FloatingVideoPlayer({
             <button
               type="button"
               aria-label="Close video player"
-              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-900"
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
               onPointerDown={stopDragStart}
               onClick={onClose}
             >
@@ -252,7 +252,7 @@ export function FloatingVideoPlayer({
             </button>
           </div>
         ) : (
-          <div className="relative flex h-full flex-col overflow-hidden rounded-3xl border border-neutral-200 bg-white shadow-2xl shadow-black/15">
+          <div className="relative flex h-full flex-col overflow-hidden rounded-3xl border border-border bg-card shadow-2xl shadow-black/15">
             {renderResizeHandle("top", "left-4 top-0 h-2 w-[calc(100%-2rem)] cursor-ns-resize", "Resize video player from top edge")}
             {renderResizeHandle("right", "right-0 top-4 h-[calc(100%-2rem)] w-2 cursor-ew-resize", "Resize video player from right edge")}
             {renderResizeHandle("bottom", "bottom-0 left-4 h-2 w-[calc(100%-2rem)] cursor-ns-resize", "Resize video player from bottom edge")}
@@ -263,15 +263,15 @@ export function FloatingVideoPlayer({
             {renderResizeHandle("bottom-right", "bottom-0 right-0 h-4 w-4 cursor-nwse-resize rounded-br-3xl", "Resize video player from bottom-right corner")}
 
             <div
-              className="relative z-10 flex cursor-grab items-center justify-between gap-3 border-b border-neutral-100 px-4 py-3 active:cursor-grabbing"
+              className="relative z-10 flex cursor-grab items-center justify-between gap-3 border-b border-border px-4 py-3 active:cursor-grabbing"
               onPointerDown={(event) => dragControls.start(event)}
             >
               <GripHorizontal className="h-4 w-4 shrink-0 text-neutral-400" />
               <div className="min-w-0 flex-1 pr-1">
-                <p className="line-clamp-1 text-sm font-semibold leading-5 text-neutral-900">
+                <p className="line-clamp-1 text-sm font-semibold leading-5 text-foreground">
                   {video.title}
                 </p>
-                <p className="line-clamp-1 text-xs leading-4 text-neutral-500">
+                <p className="line-clamp-1 text-xs leading-4 text-muted-foreground">
                   {video.channelTitle}
                 </p>
               </div>
@@ -279,7 +279,7 @@ export function FloatingVideoPlayer({
                 <button
                   type="button"
                   aria-label="Reset size"
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-full text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-900"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
                   onPointerDown={handleResetSize}
                   onClick={(event) => event.preventDefault()}
                 >
@@ -288,7 +288,7 @@ export function FloatingVideoPlayer({
                 <button
                   type="button"
                   aria-label="Minimize video player"
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-full text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-900"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
                   onPointerDown={stopDragStart}
                   onClick={() => setIsMinimized(true)}
                 >
@@ -297,7 +297,7 @@ export function FloatingVideoPlayer({
                 <button
                   type="button"
                   aria-label="Close video player"
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-full text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-900"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
                   onPointerDown={stopDragStart}
                   onClick={onClose}
                 >
@@ -316,21 +316,21 @@ export function FloatingVideoPlayer({
               />
             </div>
 
-            <div className="relative z-10 mt-auto space-y-2 border-t border-neutral-100 px-4 py-3 text-xs text-neutral-600">
+            <div className="relative z-10 mt-auto space-y-2 border-t border-border px-4 py-3 text-xs text-muted-foreground">
               {video.relevanceReason ? (
-                <p className="line-clamp-2 leading-5 text-neutral-500">
+                <p className="line-clamp-2 leading-5 text-muted-foreground">
                   {video.relevanceReason}
                 </p>
               ) : null}
               <div className="flex items-center justify-between gap-3">
-                <p className="line-clamp-1 min-w-0 text-xs leading-4 text-neutral-500">
+                <p className="line-clamp-1 min-w-0 text-xs leading-4 text-muted-foreground">
                   {video.channelTitle}
                 </p>
                 <a
                   href={video.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-1 text-xs font-medium text-neutral-600 transition hover:bg-neutral-100 hover:text-neutral-950"
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-1 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
                 >
                   Open on YouTube
                   <ExternalLink className="h-3.5 w-3.5" />

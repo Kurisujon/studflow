@@ -735,17 +735,18 @@ export function InteractiveSummaryReader({
     <section style={{ width: "100%", display: "block" }}>
       <div
         ref={rootRef}
-        style={{ cursor: "text" }}
+        style={{
+          cursor: "text",
+        }}
       >
         <div style={{ display: "grid", gap: "1rem", marginBottom: "1.5rem" }}>
           <div
             style={{
               padding: "1.4rem",
               borderRadius: "24px",
-              background:
-                "linear-gradient(135deg, rgba(255,247,237,0.95), rgba(255,255,255,0.96))",
-              border: "1px solid rgba(251, 191, 36, 0.25)",
-              boxShadow: "0 18px 48px rgba(245, 158, 11, 0.08)",
+              background: "linear-gradient(135deg, var(--theme-soft), var(--card))",
+              border: "1px solid var(--theme-border)",
+              boxShadow: "0 18px 48px var(--theme-shadow)",
             }}
           >
             <p
@@ -753,7 +754,7 @@ export function InteractiveSummaryReader({
                 fontSize: "0.72rem",
                 letterSpacing: "0.08em",
                 textTransform: "uppercase",
-                color: "#b45309",
+                color: "var(--theme-primary)",
                 marginBottom: "0.55rem",
               }}
             >
@@ -773,7 +774,7 @@ export function InteractiveSummaryReader({
                 fontFamily: '"Geist", "Inter", "Segoe UI", "Helvetica Neue", Arial, sans-serif',
                 fontSize: "1.05rem",
                 lineHeight: 1.85,
-                color: "#3f2a14",
+                color: "var(--distill-text-secondary)",
               }}
             />
           </div>
@@ -806,7 +807,7 @@ export function InteractiveSummaryReader({
                 fontSize: "0.82rem",
                 letterSpacing: "0.08em",
                 textTransform: "uppercase",
-                color: "#9a3412",
+                color: "var(--theme-primary)",
               }}
             >
               Topic {activeIndex + 1} of {sections.length}
@@ -818,7 +819,7 @@ export function InteractiveSummaryReader({
                 maxWidth: "320px",
                 height: "8px",
                 borderRadius: "999px",
-                backgroundColor: "rgba(251,191,36,0.18)",
+                backgroundColor: "var(--theme-soft)",
                 overflow: "hidden",
               }}
             >
@@ -826,7 +827,7 @@ export function InteractiveSummaryReader({
                 style={{
                   width: `${progress}%`,
                   height: "100%",
-                  background: "linear-gradient(90deg, #f59e0b, #f97316, #ef4444)",
+                  background: "linear-gradient(90deg, var(--theme-primary), var(--theme-primary-hover))",
                 }}
               />
             </div>
@@ -839,10 +840,9 @@ export function InteractiveSummaryReader({
             marginInline: "auto",
             padding: "2rem",
             borderRadius: "30px",
-            background:
-              "linear-gradient(180deg, rgba(255,255,255,0.98), rgba(255,250,240,0.94))",
-            border: "1px solid rgba(249,115,22,0.18)",
-            boxShadow: "0 24px 64px rgba(249,115,22,0.08)",
+            background: "linear-gradient(180deg, var(--card), color-mix(in srgb, var(--card) 88%, var(--theme-soft)))",
+            border: "1px solid var(--theme-border)",
+            boxShadow: "0 24px 64px var(--theme-shadow)",
           }}
         >
           <p
@@ -850,7 +850,7 @@ export function InteractiveSummaryReader({
               fontSize: "0.72rem",
               letterSpacing: "0.08em",
               textTransform: "uppercase",
-              color: "#c2410c",
+              color: "var(--theme-primary)",
               marginBottom: "0.7rem",
             }}
           >
@@ -871,7 +871,7 @@ export function InteractiveSummaryReader({
               fontSize: "clamp(2rem, 4vw, 3rem)",
               lineHeight: 1.2,
               fontWeight: 700,
-              color: "#2f1c0f",
+              color: "var(--foreground)",
               marginBottom: "1.3rem",
             }}
           />
@@ -883,7 +883,7 @@ export function InteractiveSummaryReader({
                   fontSize: "0.78rem",
                   letterSpacing: "0.08em",
                   textTransform: "uppercase",
-                  color: "#ea580c",
+                  color: "var(--theme-primary)",
                   marginBottom: "0.85rem",
                 }}
               >
@@ -903,7 +903,7 @@ export function InteractiveSummaryReader({
                     fontFamily: '"Geist", "Inter", "Segoe UI", "Helvetica Neue", Arial, sans-serif',
                     fontSize: "1.04rem",
                     lineHeight: 1.9,
-                    color: "#3f2a14",
+                    color: "var(--distill-text-secondary)",
                   }}
                 >
                   {activeSection.key_points.map(renderPoint)}
@@ -916,9 +916,8 @@ export function InteractiveSummaryReader({
                 style={{
                   padding: "1.2rem 1.25rem",
                   borderRadius: "22px",
-                  background:
-                    "linear-gradient(135deg, rgba(255,237,213,0.92), rgba(255,255,255,0.96))",
-                  border: "1px solid rgba(251,146,60,0.22)",
+                  background: "linear-gradient(135deg, var(--theme-soft), var(--card))",
+                  border: "1px solid var(--theme-border)",
                 }}
               >
                 <p
@@ -926,7 +925,7 @@ export function InteractiveSummaryReader({
                     fontSize: "0.78rem",
                     letterSpacing: "0.08em",
                     textTransform: "uppercase",
-                    color: "#c2410c",
+                    color: "var(--theme-primary)",
                     marginBottom: "0.85rem",
                   }}
                 >
@@ -947,7 +946,7 @@ export function InteractiveSummaryReader({
                       fontFamily: '"Geist", "Inter", "Segoe UI", "Helvetica Neue", Arial, sans-serif',
                       fontSize: "1rem",
                       lineHeight: 1.8,
-                      color: "#4a2d1c",
+                      color: "var(--distill-text-secondary)",
                     }}
                   >
                     {activeSection.important_terms_and_definitions.map(renderTerm)}

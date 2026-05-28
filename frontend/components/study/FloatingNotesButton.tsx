@@ -31,12 +31,11 @@ export function FloatingNotesButton({
         width: "52px",
         height: "52px",
         borderRadius: "18px",
-        boxShadow: "0 16px 38px rgba(17,17,16,0.14)",
+        boxShadow: "0 16px 38px var(--theme-shadow)",
         zIndex: behindDrawer ? 60 : 79,
-        background:
-          "linear-gradient(180deg, rgba(255,255,255,0.98), rgba(255,247,237,0.96))",
-        border: "1px solid rgba(249,115,22,0.14)",
-        color: "#2f1c0f",
+        background: "linear-gradient(180deg, var(--card), var(--theme-soft))",
+        border: "1px solid var(--theme-border)",
+        color: "var(--foreground)",
       }}
       aria-label="Open study tools"
       title="Open study tools"
@@ -53,8 +52,8 @@ export function FloatingNotesButton({
           minWidth: "1.25rem",
           height: "1.25rem",
           borderRadius: "999px",
-          backgroundColor: "#111110",
-          color: "#ffffff",
+          backgroundColor: "var(--theme-primary)",
+          color: "var(--theme-on-primary)",
           fontSize: "0.72rem",
           fontWeight: 600,
           border: "1px solid rgba(255,255,255,0.22)",

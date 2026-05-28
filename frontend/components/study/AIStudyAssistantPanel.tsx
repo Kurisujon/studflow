@@ -124,22 +124,22 @@ export function AIStudyAssistantPanel({
 
   return (
     <div style={{ display: "grid", gap: "1rem" }}>
-      <div style={{ padding: "1rem", borderRadius: "18px", backgroundColor: "rgba(255,255,255,0.84)", border: "1px solid rgba(251,146,60,0.18)" }}>
-        <p style={{ fontSize: "0.75rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "#c2410c", marginBottom: "0.45rem" }}>
+      <div style={{ padding: "1rem", borderRadius: "18px", backgroundColor: "var(--card)", border: "1px solid var(--theme-border)" }}>
+        <p style={{ fontSize: "0.75rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--theme-primary)", marginBottom: "0.45rem" }}>
           {loadedHistoryItem ? "Context from history" : displayedContext.source === "note" ? "Context from note" : "Context"}
         </p>
         {displayedContext.source === "note" ? (
           <div style={{ display: "grid", gap: "0.55rem" }}>
-            <p style={{ color: "#7c2d12", lineHeight: 1.6 }}>
+            <p style={{ color: "var(--muted-foreground)", lineHeight: 1.6 }}>
               <strong>Selected text:</strong>{" "}
               {displayedContext.selectedText ? `“${displayedContext.selectedText}”` : "General note"}
             </p>
-            <p style={{ color: "#7c2d12", lineHeight: 1.6 }}>
+            <p style={{ color: "var(--muted-foreground)", lineHeight: 1.6 }}>
               <strong>Your note:</strong> {displayedContext.noteContent}
             </p>
           </div>
         ) : (
-          <p style={{ color: "#7c2d12" }}>
+          <p style={{ color: "var(--muted-foreground)" }}>
             {displayedContext.selectedText ? `“${displayedContext.selectedText}”` : "Select text in the reader to ask the AI tool."}
           </p>
         )}
@@ -158,7 +158,7 @@ export function AIStudyAssistantPanel({
       </div>
 
       <label style={{ display: "grid", gap: "0.45rem" }}>
-        <span style={{ fontSize: "0.75rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "#9a3412" }}>
+        <span style={{ fontSize: "0.75rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--theme-primary)" }}>
           Ask your question
         </span>
         <textarea
@@ -170,10 +170,10 @@ export function AIStudyAssistantPanel({
           style={{
             width: "100%",
             borderRadius: "16px",
-            border: "1px solid rgba(251,146,60,0.18)",
+            border: "1px solid var(--theme-border)",
             padding: "0.95rem",
             resize: "vertical",
-            backgroundColor: "rgba(255,255,255,0.86)",
+            backgroundColor: "var(--card)",
           }}
         />
       </label>
@@ -186,32 +186,32 @@ export function AIStudyAssistantPanel({
 
       {response ? (
         <div style={{ display: "grid", gap: "1rem" }}>
-          <div style={{ padding: "1rem", borderRadius: "18px", backgroundColor: "rgba(255,255,255,0.84)", border: "1px solid rgba(251,146,60,0.18)" }}>
-            <p style={{ fontSize: "0.75rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "#c2410c", marginBottom: "0.45rem" }}>
+          <div style={{ padding: "1rem", borderRadius: "18px", backgroundColor: "var(--card)", border: "1px solid var(--theme-border)" }}>
+            <p style={{ fontSize: "0.75rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--theme-primary)", marginBottom: "0.45rem" }}>
               {mode === "define-term" ? "Definition and Usage" : mode === "simplify" ? "Simplified Explanation" : "Response"}
             </p>
-            <p style={{ color: "#3f2a14", lineHeight: 1.8 }}>
+            <p style={{ color: "var(--foreground)", lineHeight: 1.8 }}>
               {response.simplifiedExplanation}
             </p>
           </div>
 
           {mode === "ask-ai" && response.example ? (
-            <div style={{ padding: "1rem", borderRadius: "18px", backgroundColor: "rgba(255,255,255,0.84)", border: "1px solid rgba(251,146,60,0.18)" }}>
-              <p style={{ fontSize: "0.75rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "#c2410c", marginBottom: "0.45rem" }}>
+            <div style={{ padding: "1rem", borderRadius: "18px", backgroundColor: "var(--card)", border: "1px solid var(--theme-border)" }}>
+              <p style={{ fontSize: "0.75rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--theme-primary)", marginBottom: "0.45rem" }}>
                 Example
               </p>
-              <p style={{ color: "#3f2a14", lineHeight: 1.8 }}>{response.example}</p>
+              <p style={{ color: "var(--foreground)", lineHeight: 1.8 }}>{response.example}</p>
             </div>
           ) : null}
 
           {mode === "ask-ai" && response.relatedTerms.length > 0 ? (
-            <div style={{ padding: "1rem", borderRadius: "18px", backgroundColor: "rgba(255,247,237,0.92)", border: "1px solid rgba(251,191,36,0.18)" }}>
-              <p style={{ fontSize: "0.75rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "#c2410c", marginBottom: "0.45rem" }}>
+            <div style={{ padding: "1rem", borderRadius: "18px", backgroundColor: "var(--theme-soft)", border: "1px solid var(--theme-border)" }}>
+              <p style={{ fontSize: "0.75rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--theme-primary)", marginBottom: "0.45rem" }}>
                 Related Terms
               </p>
               <ul style={{ display: "grid", gap: "0.55rem", paddingLeft: "1rem" }}>
                 {response.relatedTerms.map((term, index) => (
-                  <li key={`related-${index}`} style={{ color: "#4a2d1c" }}>
+                  <li key={`related-${index}`} style={{ color: "var(--distill-text-secondary)" }}>
                     {term}
                   </li>
                 ))}
@@ -221,14 +221,14 @@ export function AIStudyAssistantPanel({
         </div>
       ) : null}
 
-      <div style={{ display: "grid", gap: "0.7rem", paddingTop: "0.8rem", borderTop: "1px solid rgba(249,115,22,0.12)" }}>
-        <p style={{ fontSize: "0.75rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "#c2410c" }}>
+      <div style={{ display: "grid", gap: "0.7rem", paddingTop: "0.8rem", borderTop: "1px solid var(--theme-border)" }}>
+        <p style={{ fontSize: "0.75rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--theme-primary)" }}>
           Recent AI History
         </p>
         {historyLoading ? (
-          <p style={{ color: "#7c2d12", fontSize: "0.9rem" }}>Loading history...</p>
+          <p style={{ color: "var(--muted-foreground)", fontSize: "0.9rem" }}>Loading history...</p>
         ) : history.length === 0 ? (
-          <p style={{ color: "#7c2d12", fontSize: "0.9rem" }}>No AI history yet.</p>
+          <p style={{ color: "var(--muted-foreground)", fontSize: "0.9rem" }}>No AI history yet.</p>
         ) : (
           history.slice(0, 8).map((item) => (
             <button
@@ -239,16 +239,16 @@ export function AIStudyAssistantPanel({
                 textAlign: "left",
                 padding: "0.85rem",
                 borderRadius: "16px",
-                border: "1px solid rgba(251,146,60,0.16)",
-                backgroundColor: "rgba(255,255,255,0.72)",
+                border: "1px solid var(--theme-border)",
+                backgroundColor: "var(--card)",
                 cursor: "pointer",
               }}
             >
-              <p style={{ color: "#3f2a14", fontWeight: 650, marginBottom: "0.3rem" }}>{item.question}</p>
-              <p style={{ color: "#7c2d12", fontSize: "0.86rem", lineHeight: 1.5, marginBottom: "0.35rem" }}>
+              <p style={{ color: "var(--foreground)", fontWeight: 650, marginBottom: "0.3rem" }}>{item.question}</p>
+              <p style={{ color: "var(--muted-foreground)", fontSize: "0.86rem", lineHeight: 1.5, marginBottom: "0.35rem" }}>
                 {item.answer.slice(0, 120)}{item.answer.length > 120 ? "..." : ""}
               </p>
-              <p style={{ color: "#9a3412", fontSize: "0.78rem" }}>
+              <p style={{ color: "var(--theme-primary)", fontSize: "0.78rem" }}>
                 {item.source === "note" ? "Note" : item.source === "selection" ? "Selection" : "General"} - {new Date(item.createdAt).toLocaleString()}
               </p>
             </button>

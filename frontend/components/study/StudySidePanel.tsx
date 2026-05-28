@@ -60,27 +60,26 @@ export function StudySidePanel({
           transition={{ duration: 0.2, ease: "easeOut" }}
           style={{
             position: "fixed",
-            right: "80px",
-            top: "128px",
+            right: "24px",
+            top: "calc(var(--nav-height) + 24px)",
             width: "100%",
-            maxWidth: "420px",
-            maxHeight: "78vh",
+            maxWidth: "380px",
+            maxHeight: "calc(100dvh - var(--nav-height) - 48px)",
             padding: "1.3rem",
             borderRadius: "24px",
-            background:
-              "linear-gradient(180deg, rgba(255,255,255,0.98), rgba(255,244,230,0.96))",
-            border: "1px solid rgba(249,115,22,0.18)",
-            boxShadow: "0 22px 60px rgba(249,115,22,0.08)",
+            backgroundColor: "var(--card)",
+            border: "1px solid var(--theme-border)",
+            boxShadow: "0 22px 60px var(--theme-shadow)",
             overflowY: "auto",
-            zIndex: 75,
+            zIndex: 120,
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1rem" }}>
             <div>
-              <p style={{ fontSize: "0.72rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "#c2410c", marginBottom: "0.3rem" }}>
+              <p style={{ fontSize: "0.72rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--theme-primary)", marginBottom: "0.3rem" }}>
                 Message Bubble
               </p>
-              <h3 style={{ color: "#2f1c0f" }}>Study tools</h3>
+              <h3 style={{ color: "var(--foreground)" }}>Study tools</h3>
             </div>
           </div>
 
@@ -92,9 +91,9 @@ export function StudySidePanel({
                 minHeight: "40px",
                 paddingInline: "16px",
                 borderRadius: "999px",
-                border: "1px solid rgba(249,115,22,0.18)",
-                backgroundColor: activeTab === "notes" ? "#111110" : "rgba(255,255,255,0.82)",
-                color: activeTab === "notes" ? "#fff" : "#2f1c0f",
+                border: "1px solid var(--theme-border)",
+                backgroundColor: activeTab === "notes" ? "var(--theme-primary)" : "var(--card)",
+                color: activeTab === "notes" ? "var(--theme-on-primary)" : "var(--foreground)",
                 fontWeight: 600,
                 cursor: "pointer",
               }}
@@ -108,9 +107,9 @@ export function StudySidePanel({
                 minHeight: "40px",
                 paddingInline: "16px",
                 borderRadius: "999px",
-                border: "1px solid rgba(249,115,22,0.18)",
-                backgroundColor: activeTab === "ai" ? "#111110" : "rgba(255,255,255,0.82)",
-                color: activeTab === "ai" ? "#fff" : "#2f1c0f",
+                border: "1px solid var(--theme-border)",
+                backgroundColor: activeTab === "ai" ? "var(--theme-primary)" : "var(--card)",
+                color: activeTab === "ai" ? "var(--theme-on-primary)" : "var(--foreground)",
                 fontWeight: 600,
                 cursor: "pointer",
               }}

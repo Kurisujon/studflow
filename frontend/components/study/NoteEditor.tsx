@@ -25,8 +25,8 @@ export function NoteEditor({
         style={{
           padding: "1rem",
           borderRadius: "18px",
-          backgroundColor: "rgba(255,255,255,0.84)",
-          border: "1px solid rgba(251,146,60,0.18)",
+          backgroundColor: "var(--card)",
+          border: "1px solid var(--theme-border)",
         }}
       >
         <p
@@ -34,13 +34,13 @@ export function NoteEditor({
             fontSize: "0.75rem",
             letterSpacing: "0.08em",
             textTransform: "uppercase",
-            color: "#c2410c",
+            color: "var(--theme-primary)",
             marginBottom: "0.45rem",
           }}
         >
           Selected Text
         </p>
-        <p style={{ color: "#7c2d12" }}>“{selectedText}”</p>
+        <p style={{ color: "var(--muted-foreground)" }}>“{selectedText}”</p>
       </div>
 
       <label style={{ display: "grid", gap: "0.45rem" }}>
@@ -49,7 +49,7 @@ export function NoteEditor({
             fontSize: "0.75rem",
             letterSpacing: "0.08em",
             textTransform: "uppercase",
-            color: "#9a3412",
+            color: "var(--theme-primary)",
           }}
         >
           Note
@@ -62,10 +62,11 @@ export function NoteEditor({
           style={{
             width: "100%",
             borderRadius: "16px",
-            border: "1px solid rgba(251,146,60,0.18)",
+            border: "1px solid var(--theme-border)",
             padding: "0.95rem",
             resize: "vertical",
-            backgroundColor: "rgba(255,255,255,0.86)",
+            backgroundColor: "var(--card)",
+            color: "var(--foreground)",
           }}
         />
       </label>

@@ -52,7 +52,7 @@ export function NotesPanel({
   return (
     <div style={{ display: "grid", gap: "1rem" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.75rem" }}>
-        <p style={{ fontSize: "0.75rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "#c2410c" }}>
+        <p style={{ fontSize: "0.75rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--theme-primary)" }}>
           Notes
         </p>
         <div style={{ display: "flex", gap: "0.45rem" }}>
@@ -68,8 +68,8 @@ export function NotesPanel({
       {view === "active" ? (
         <div style={{ display: "grid", gap: "0.75rem" }}>
           {notes.length === 0 ? (
-            <div style={{ padding: "1rem", borderRadius: "18px", backgroundColor: "rgba(255,255,255,0.84)", border: "1px solid rgba(251,146,60,0.18)" }}>
-              <p style={{ color: "#7c2d12" }}>No notes yet for this topic.</p>
+            <div style={{ padding: "1rem", borderRadius: "18px", backgroundColor: "var(--card)", border: "1px solid var(--theme-border)" }}>
+              <p style={{ color: "var(--muted-foreground)" }}>No notes yet for this topic.</p>
             </div>
           ) : (
             notes.map((note) => (
@@ -82,15 +82,15 @@ export function NotesPanel({
                   textAlign: "left",
                   padding: "1rem",
                   borderRadius: "18px",
-                  backgroundColor: focusedNoteId === note.id ? "rgba(254,243,199,0.94)" : "rgba(255,255,255,0.84)",
-                  border: focusedNoteId === note.id ? "1px solid rgba(245,158,11,0.55)" : "1px solid rgba(251,146,60,0.18)",
+                  backgroundColor: focusedNoteId === note.id ? "var(--theme-soft)" : "var(--card)",
+                  border: focusedNoteId === note.id ? "1px solid var(--theme-primary)" : "1px solid var(--theme-border)",
                   cursor: canJumpToText(note) ? "pointer" : "default",
-                  boxShadow: focusedNoteId === note.id ? "0 14px 32px rgba(245,158,11,0.12)" : undefined,
+                  boxShadow: focusedNoteId === note.id ? "0 14px 32px var(--theme-shadow)" : undefined,
                 }}
               >
-                <p style={{ color: "#7c2d12", marginBottom: "0.4rem" }}>{noteLabel(note)}</p>
-                <p style={{ color: "#3f2a14", marginBottom: "0.65rem" }}>{note.content}</p>
-                <p style={{ color: "#9a3412", fontSize: "0.82rem", marginBottom: "0.7rem" }}>
+                <p style={{ color: "var(--theme-primary)", marginBottom: "0.4rem" }}>{noteLabel(note)}</p>
+                <p style={{ color: "var(--foreground)", marginBottom: "0.65rem" }}>{note.content}</p>
+                <p style={{ color: "var(--muted-foreground)", fontSize: "0.82rem", marginBottom: "0.7rem" }}>
                   Updated {new Date(note.updatedAt).toLocaleString()}
                 </p>
                 <div style={{ display: "flex", gap: "0.65rem", flexWrap: "wrap" }}>
@@ -108,8 +108,8 @@ export function NotesPanel({
       ) : (
         <div style={{ display: "grid", gap: "0.75rem" }}>
           {deletedNotes.length === 0 ? (
-            <div style={{ padding: "1rem", borderRadius: "18px", backgroundColor: "rgba(255,255,255,0.84)", border: "1px solid rgba(251,146,60,0.18)" }}>
-              <p style={{ color: "#7c2d12" }}>Trash is empty.</p>
+            <div style={{ padding: "1rem", borderRadius: "18px", backgroundColor: "var(--card)", border: "1px solid var(--theme-border)" }}>
+              <p style={{ color: "var(--muted-foreground)" }}>Trash is empty.</p>
             </div>
           ) : (
             deletedNotes.map((note) => (
@@ -118,13 +118,13 @@ export function NotesPanel({
                 style={{
                   padding: "1rem",
                   borderRadius: "18px",
-                  backgroundColor: "rgba(255,255,255,0.72)",
-                  border: "1px solid rgba(120,113,108,0.2)",
+                  backgroundColor: "var(--card)",
+                  border: "1px solid var(--border)",
                 }}
               >
-                <p style={{ color: "#7c2d12", marginBottom: "0.4rem" }}>{noteLabel(note)}</p>
-                <p style={{ color: "#3f2a14", marginBottom: "0.65rem" }}>{note.content}</p>
-                <p style={{ color: "#78716c", fontSize: "0.82rem", marginBottom: "0.7rem" }}>
+                <p style={{ color: "var(--theme-primary)", marginBottom: "0.4rem" }}>{noteLabel(note)}</p>
+                <p style={{ color: "var(--foreground)", marginBottom: "0.65rem" }}>{note.content}</p>
+                <p style={{ color: "var(--muted-foreground)", fontSize: "0.82rem", marginBottom: "0.7rem" }}>
                   Deleted {note.deletedAt ? new Date(note.deletedAt).toLocaleString() : "recently"}
                 </p>
                 <div style={{ display: "flex", gap: "0.65rem", flexWrap: "wrap" }}>
@@ -145,12 +145,12 @@ export function NotesPanel({
         style={{
           marginTop: "0.25rem",
           paddingTop: "0.9rem",
-          borderTop: "1px solid rgba(249,115,22,0.12)",
+          borderTop: "1px solid var(--theme-border)",
           display: view === "active" ? "grid" : "none",
           gap: "0.6rem",
         }}
       >
-        <p style={{ fontSize: "0.82rem", color: "#7c2d12" }}>
+        <p style={{ fontSize: "0.82rem", color: "var(--muted-foreground)" }}>
           {selectedTextContext
             ? `Write a note about: “${selectedTextContext}”`
             : "Write a note for this topic"}
@@ -165,10 +165,11 @@ export function NotesPanel({
             style={{
               flex: 1,
               borderRadius: "16px",
-              border: "1px solid rgba(251,146,60,0.18)",
+              border: "1px solid var(--theme-border)",
               padding: "0.9rem",
               resize: "vertical",
-              backgroundColor: "rgba(255,255,255,0.86)",
+              backgroundColor: "var(--card)",
+              color: "var(--foreground)",
             }}
           />
           <Button onClick={onSaveNote} style={{ minHeight: "42px", paddingInline: "18px", borderRadius: "14px" }}>

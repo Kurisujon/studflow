@@ -9,6 +9,8 @@ export default async function DashboardPage() {
       style={{
         minHeight: "calc(100dvh - var(--nav-height))",
         padding: "2rem 1.5rem 3rem",
+        background:
+          "radial-gradient(circle at top left, var(--theme-shadow), transparent 24%), linear-gradient(180deg, var(--background), color-mix(in srgb, var(--background) 82%, var(--theme-soft)))",
       }}
     >
       <div className="container">
@@ -23,7 +25,7 @@ export default async function DashboardPage() {
               fontSize: "0.75rem",
               letterSpacing: "0.08em",
               textTransform: "uppercase",
-              color: "var(--distill-text-muted)",
+              color: "var(--theme-primary)",
               marginBottom: "0.75rem",
             }}
           >
@@ -39,9 +41,9 @@ export default async function DashboardPage() {
           <div
             style={{
               padding: "2rem",
-              border: "1px solid var(--distill-border)",
+              border: "1px solid var(--theme-border)",
               borderRadius: "24px",
-              backgroundColor: "rgba(255,255,255,0.82)",
+              background: "color-mix(in srgb, var(--card) 92%, var(--theme-soft))",
             }}
           >
             <p>No study documents have been uploaded yet.</p>

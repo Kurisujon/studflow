@@ -40,9 +40,9 @@ export function RelatedLearningVideos({ documentId }: { documentId: string }) {
         style={{
           padding: "1.4rem",
           borderRadius: "24px",
-          background: "linear-gradient(135deg, rgba(240,253,244,0.8), rgba(255,255,255,0.96))",
-          border: "1px solid rgba(74, 222, 128, 0.25)",
-          boxShadow: "0 18px 48px rgba(34, 197, 94, 0.08)",
+          background: "linear-gradient(135deg, var(--theme-soft), var(--card))",
+          border: "1px solid var(--theme-border)",
+          boxShadow: "0 18px 48px var(--theme-shadow)",
           marginBottom: "1.5rem",
         }}
       >
@@ -51,7 +51,7 @@ export function RelatedLearningVideos({ documentId }: { documentId: string }) {
             fontSize: "0.72rem",
             letterSpacing: "0.08em",
             textTransform: "uppercase",
-            color: "#166534",
+            color: "var(--theme-primary)",
             marginBottom: "1rem",
           }}
         >
@@ -73,9 +73,9 @@ export function RelatedLearningVideos({ documentId }: { documentId: string }) {
                 flexDirection: "column",
                 borderRadius: "16px",
                 overflow: "hidden",
-                backgroundColor: "white",
-                border: "1px solid rgba(0,0,0,0.06)",
-                boxShadow: "0 4px 12px rgba(0,0,0,0.03)",
+                backgroundColor: "var(--card)",
+                border: "1px solid var(--border)",
+                boxShadow: "0 4px 12px color-mix(in srgb, var(--foreground) 5%, transparent)",
                 transition: "transform 0.2s ease",
               }}
             >
@@ -113,7 +113,7 @@ export function RelatedLearningVideos({ documentId }: { documentId: string }) {
                       left: 0,
                       width: "100%",
                       height: "100%",
-                      backgroundColor: "#e2e8f0",
+                      backgroundColor: "var(--muted)",
                     }}
                   />
                 )}
@@ -135,7 +135,7 @@ export function RelatedLearningVideos({ documentId }: { documentId: string }) {
                       fontSize: "0.95rem",
                       fontWeight: 600,
                       lineHeight: 1.3,
-                      color: "#1e293b",
+                      color: "var(--foreground)",
                       marginBottom: "0.25rem",
                       display: "-webkit-box",
                       WebkitLineClamp: 2,
@@ -146,13 +146,13 @@ export function RelatedLearningVideos({ documentId }: { documentId: string }) {
                     {video.title}
                   </h3>
                 </button>
-                <p style={{ fontSize: "0.75rem", color: "#64748b", marginBottom: "0.5rem" }}>
+                <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", marginBottom: "0.5rem" }}>
                   {video.channelTitle}
                 </p>
                 <p
                   style={{
                     fontSize: "0.8rem",
-                    color: "#475569",
+                    color: "var(--distill-text-secondary)",
                     lineHeight: 1.4,
                     marginBottom: "1rem",
                     flex: 1,
@@ -174,8 +174,8 @@ export function RelatedLearningVideos({ documentId }: { documentId: string }) {
                     width: "100%",
                     minHeight: "38px",
                     borderRadius: "10px",
-                    border: "1px solid #22c55e",
-                    color: "#166534",
+                    border: "1px solid var(--theme-primary)",
+                    color: "var(--theme-primary)",
                     backgroundColor: "transparent",
                     fontSize: "0.85rem",
                     fontWeight: 600,

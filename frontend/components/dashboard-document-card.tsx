@@ -19,11 +19,11 @@ export function DashboardDocumentCard({
   return (
     <article
       style={{
-        border: "1px solid var(--distill-border)",
+        border: "1px solid var(--theme-border)",
         borderRadius: "24px",
         padding: "1.35rem",
-        backgroundColor: "rgba(255,255,255,0.82)",
-        boxShadow: "0 14px 40px rgba(17,17,16,0.05)",
+        background: "color-mix(in srgb, var(--card) 92%, var(--theme-soft))",
+        boxShadow: "0 14px 40px var(--theme-shadow)",
       }}
     >
       <div
@@ -41,7 +41,7 @@ export function DashboardDocumentCard({
               fontSize: "0.72rem",
               letterSpacing: "0.08em",
               textTransform: "uppercase",
-              color: "var(--distill-text-muted)",
+              color: "var(--theme-primary)",
               marginBottom: "0.45rem",
             }}
           >
@@ -63,8 +63,8 @@ export function DashboardDocumentCard({
           style={{
             padding: "0.35rem 0.6rem",
             borderRadius: "999px",
-            backgroundColor: "var(--distill-border)",
-            color: "var(--distill-text-secondary)",
+            backgroundColor: "var(--theme-soft)",
+            color: "var(--foreground)",
             fontSize: "0.72rem",
             textTransform: "uppercase",
             letterSpacing: "0.06em",
@@ -101,8 +101,8 @@ export function DashboardDocumentCard({
             style={{
               padding: "0.85rem",
               borderRadius: "18px",
-              backgroundColor: "rgba(249,249,248,0.92)",
-              border: "1px solid var(--distill-border)",
+              backgroundColor: "var(--card)",
+              border: "1px solid var(--theme-border)",
             }}
           >
             <p
@@ -110,7 +110,7 @@ export function DashboardDocumentCard({
                 fontSize: "0.72rem",
                 letterSpacing: "0.06em",
                 textTransform: "uppercase",
-                color: "var(--distill-text-muted)",
+                color: "var(--muted-foreground)",
                 marginBottom: "0.3rem",
               }}
             >
@@ -133,7 +133,13 @@ export function DashboardDocumentCard({
           render={<Link href={`/dashboard/study/${document.id}?tab=summary`} />}
           variant="default"
           size="lg"
-          style={{ minHeight: "42px", paddingInline: "16px", borderRadius: "14px", color: "#ffffff", backgroundColor: "#111110" }}
+          style={{
+            minHeight: "42px",
+            paddingInline: "16px",
+            borderRadius: "14px",
+            color: "var(--theme-on-primary)",
+            backgroundColor: "var(--theme-primary)",
+          }}
         >
           Summary
         </Button>
@@ -142,7 +148,14 @@ export function DashboardDocumentCard({
           render={<Link href={`/dashboard/study/${document.id}?tab=flashcards`} />}
           variant="outline"
           size="lg"
-          style={{ minHeight: "42px", paddingInline: "16px", borderRadius: "14px", color: "#2f1c0f", backgroundColor: "rgba(255,255,255,0.86)" }}
+          style={{
+            minHeight: "42px",
+            paddingInline: "16px",
+            borderRadius: "14px",
+            color: "var(--foreground)",
+            backgroundColor: "var(--card)",
+            border: "1px solid var(--theme-border)",
+          }}
         >
           Flashcards
         </Button>
@@ -151,7 +164,14 @@ export function DashboardDocumentCard({
           render={<Link href={`/dashboard/study/${document.id}?tab=quiz`} />}
           variant="outline"
           size="lg"
-          style={{ minHeight: "42px", paddingInline: "16px", borderRadius: "14px", color: "#2f1c0f", backgroundColor: "rgba(255,255,255,0.86)" }}
+          style={{
+            minHeight: "42px",
+            paddingInline: "16px",
+            borderRadius: "14px",
+            color: "var(--foreground)",
+            backgroundColor: "var(--card)",
+            border: "1px solid var(--theme-border)",
+          }}
         >
           Quiz
         </Button>

@@ -95,7 +95,7 @@ function renderTextWithOptionalTermLabel(
   return (
     <>
       {before}
-      <strong style={{ color: "#9a3412" }}>{label}</strong>
+      <strong style={{ color: "var(--theme-primary)" }}>{label}</strong>
       {after}
     </>
   );
@@ -187,7 +187,7 @@ function renderAnnotatedNodes({
     }
 
     if (note) {
-      style.borderBottom = "1px dashed #f59e0b";
+      style.borderBottom = "1px dashed var(--theme-primary)";
       style.borderRadius = "0.2rem";
       style.cursor = "pointer";
     }
@@ -226,7 +226,7 @@ function renderAnnotatedNodes({
               display: "inline-flex",
               marginLeft: "0.22rem",
               verticalAlign: "-0.1rem",
-              color: "#d97706",
+              color: "var(--theme-primary)",
               cursor: "pointer",
               userSelect: "none",
             }}

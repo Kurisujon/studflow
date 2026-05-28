@@ -91,7 +91,7 @@ export function FlashcardStudy({
             style={{
               width: `${progress}%`,
               height: "100%",
-              backgroundColor: "var(--distill-text-primary)",
+              backgroundColor: "var(--theme-primary)",
             }}
           />
         </div>
@@ -114,9 +114,8 @@ export function FlashcardStudy({
             transformStyle: "preserve-3d",
             border: "1px solid var(--distill-border)",
             borderRadius: "28px",
-            background:
-              "linear-gradient(180deg, rgba(255,255,255,0.96), rgba(245,245,243,0.96))",
-            boxShadow: "0 24px 56px rgba(17,17,16,0.06)",
+            background: "linear-gradient(180deg, var(--card), color-mix(in srgb, var(--card) 86%, var(--theme-soft)))",
+            boxShadow: "0 24px 56px color-mix(in srgb, var(--foreground) 8%, transparent)",
             cursor: "pointer",
             padding: 0,
           }}

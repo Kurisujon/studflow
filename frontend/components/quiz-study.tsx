@@ -98,8 +98,8 @@ export function QuizStudy({
           padding: "2rem",
           background:
             passed
-              ? "linear-gradient(180deg, rgba(255,255,255,0.95), rgba(255,248,235,0.96))"
-              : "linear-gradient(180deg, rgba(255,255,255,0.95), rgba(250,250,249,0.96))",
+              ? "linear-gradient(180deg, var(--card), var(--theme-soft))"
+              : "linear-gradient(180deg, var(--card), var(--muted))",
           position: "relative",
           overflow: "hidden",
         }}
@@ -171,7 +171,8 @@ export function QuizStudy({
         border: "1px solid var(--distill-border)",
         borderRadius: "28px",
         padding: "2rem",
-        backgroundColor: "rgba(255,255,255,0.84)",
+        backgroundColor: "var(--card)",
+        color: "var(--foreground)",
       }}
     >
       <p
@@ -195,7 +196,7 @@ export function QuizStudy({
           const selected = selectedIndex === optionIndex;
           const optionIsCorrect = question.correct_answer_index === optionIndex;
 
-          let backgroundColor = "rgba(255,255,255,0.78)";
+          let backgroundColor = "var(--card)";
           let borderColor = "var(--distill-border)";
           let textColor = "var(--distill-text-primary)";
 
@@ -206,8 +207,8 @@ export function QuizStudy({
             backgroundColor = "rgba(220, 38, 38, 0.10)";
             borderColor = "rgba(220, 38, 38, 0.28)";
           } else if (selected) {
-            backgroundColor = "rgba(17,17,16,0.06)";
-            borderColor = "rgba(17,17,16,0.18)";
+            backgroundColor = "var(--theme-soft)";
+            borderColor = "var(--theme-border)";
             textColor = "var(--distill-text-primary)";
           }
 
@@ -240,7 +241,7 @@ export function QuizStudy({
             padding: "1rem",
             borderRadius: "18px",
             border: "1px solid var(--distill-border)",
-            backgroundColor: "rgba(249,249,248,0.92)",
+            backgroundColor: "var(--muted)",
           }}
         >
           <p
