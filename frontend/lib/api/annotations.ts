@@ -1,4 +1,4 @@
-import { API_BASE_URL } from "@/lib/api";
+import { API_BASE_URL, buildAPIError } from "@/lib/api";
 import type {
   AIExplanation,
   AIContextSource,
@@ -50,11 +50,11 @@ export async function askAIAboutSelection(
     }),
   });
 
-  const payload = (await response.json()) as AIExplanation | { detail: string };
-
   if (!response.ok) {
-    throw new Error("detail" in payload ? payload.detail : "AI explanation failed.");
+    throw await buildAPIError(response, "AI explanation failed");
   }
+
+  const payload = (await response.json()) as AIExplanation;
 
   if (!isAIExplanation(payload)) {
     throw new Error("AI response was missing explanation content.");
@@ -71,7 +71,7 @@ export async function getAnnotations(documentId: string, authToken: string | nul
     headers,
   });
 
-  if (!response.ok) throw new Error("Failed to fetch annotations.");
+  if (!response.ok) throw await buildAPIError(response, "Failed to fetch annotations");
   return response.json();
 }
 
@@ -96,7 +96,7 @@ export async function createAnnotation(documentId: string, payload: CreateAnnota
     body: JSON.stringify(payload),
   });
 
-  if (!response.ok) throw new Error("Failed to create annotation.");
+  if (!response.ok) throw await buildAPIError(response, "Failed to create annotation");
   return response.json();
 }
 
@@ -116,7 +116,7 @@ export async function updateAnnotation(annotationId: string, payload: UpdateAnno
     body: JSON.stringify(payload),
   });
 
-  if (!response.ok) throw new Error("Failed to update annotation.");
+  if (!response.ok) throw await buildAPIError(response, "Failed to update annotation");
   return response.json();
 }
 
@@ -134,5 +134,5 @@ export async function deleteAnnotation(annotationId: string, authToken: string |
     return;
   }
 
-  if (!response.ok) throw new Error("Failed to delete annotation.");
+  if (!response.ok) throw await buildAPIError(response, "Failed to delete annotation");
 }

@@ -1,4 +1,4 @@
-import { API_BASE_URL } from "@/lib/api";
+import { API_BASE_URL, readAPIErrorDetail } from "@/lib/api";
 import type { DocumentListItem, StudyDocument } from "@/lib/types";
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
@@ -18,16 +18,7 @@ async function fetchJSON<T>(path: string): Promise<T> {
   });
 
   if (!response.ok) {
-    let detail = response.statusText;
-
-    try {
-      const payload = (await response.json()) as { detail?: unknown };
-      if (typeof payload.detail === "string") {
-        detail = payload.detail;
-      }
-    } catch {
-      // Keep the HTTP status text when the backend does not return JSON.
-    }
+    const detail = await readAPIErrorDetail(response);
 
     if (response.status === 401 || response.status === 403) {
       redirect("/sign-in");

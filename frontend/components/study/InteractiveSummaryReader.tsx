@@ -374,6 +374,25 @@ export function InteractiveSummaryReader({
     )[0];
   }
 
+  function buildAIContextFromSelection(selection: SelectionState): StudyAIContext {
+    const highlight = findBestOverlappingAnnotation("highlight", selection);
+    const underline = findBestOverlappingAnnotation("underline", selection);
+    const matchedAnnotation = [highlight, underline]
+      .filter((annotation): annotation is Annotation => Boolean(annotation))
+      .sort(
+        (first, second) =>
+          getOverlapLength(second, selection) - getOverlapLength(first, selection),
+      )[0];
+
+    return {
+      source:
+        matchedAnnotation?.type === "highlight" || matchedAnnotation?.type === "underline"
+          ? matchedAnnotation.type
+          : "selection",
+      selectedText: selection.selectedText,
+    };
+  }
+
   function saveRangeAnnotation(type: "highlight", color: AnnotationColor): void;
   function saveRangeAnnotation(type: "underline", color: UnderlineColor): void;
   function saveRangeAnnotation(type: "highlight" | "underline", color: AnnotationColor | UnderlineColor) {
@@ -693,10 +712,7 @@ export function InteractiveSummaryReader({
     if (!pendingSelection) return;
     setSelectionState(pendingSelection);
     setAiContextText(pendingSelection.selectedText);
-    setAiContext({
-      source: "selection",
-      selectedText: pendingSelection.selectedText,
-    });
+    setAiContext(buildAIContextFromSelection(pendingSelection));
     setDrawerOpen(true);
     setActiveBubbleTab("ai");
     setAiMode(mode);
@@ -1180,10 +1196,10 @@ export function InteractiveSummaryReader({
           setActiveBubbleTab("ai");
           setAiMode("ask-ai");
           setAssistantInitialQuestion("");
-          setAiContextText(note.selectedText ?? note.content);
+          setAiContextText(note.selectedText ?? "General note");
           setAiContext({
             source: "note",
-            selectedText: note.selectedText ?? note.content,
+            selectedText: note.selectedText ?? "",
             noteContent: note.content,
           });
           setSelectionState(

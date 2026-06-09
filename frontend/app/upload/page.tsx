@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { DocumentProcessingStatus } from "@/components/document-processing-status";
 import { useDocumentStatus } from "@/hooks/use-document-status";
-import { API_BASE_URL } from "@/lib/api";
+import { API_BASE_URL, buildAPIError } from "@/lib/api";
 import { useAuth } from "@clerk/nextjs";
 
 type UploadResponse = {
@@ -84,11 +84,11 @@ export default function UploadPage() {
         body: formData,
       });
 
-      const payload = (await response.json()) as UploadResponse | { detail: string };
-
       if (!response.ok) {
-        throw new Error("detail" in payload ? payload.detail : "Upload failed.");
+        throw await buildAPIError(response, "Upload failed");
       }
+
+      const payload = (await response.json()) as UploadResponse;
 
       if (!isUploadResponse(payload)) {
         throw new Error("Upload response was missing the document id.");

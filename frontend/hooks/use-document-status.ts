@@ -2,7 +2,7 @@
 
 import { useEffect, useEffectEvent, useState } from "react";
 
-import { API_BASE_URL } from "@/lib/api";
+import { API_BASE_URL, buildAPIError } from "@/lib/api";
 import { useAuth } from "@clerk/nextjs";
 
 export type DocumentStatusResponse = {
@@ -61,7 +61,7 @@ export function useDocumentStatus(
       );
 
       if (!response.ok) {
-        throw new Error("Failed to fetch document status.");
+        throw await buildAPIError(response, "Failed to fetch document status");
       }
 
       const payload =

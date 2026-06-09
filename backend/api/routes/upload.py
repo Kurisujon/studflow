@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import uuid
 from pathlib import Path
 
@@ -20,6 +21,7 @@ from services.storage import (
 from tasks.document_processing import process_document_task
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 ALLOWED_EXTENSIONS = {".pdf", ".docx"}
 ALLOWED_CONTENT_TYPES = {
@@ -69,58 +71,90 @@ async def upload_document(
     current_user: CurrentUser = Depends(get_current_user),
     session: Session = Depends(get_session),
 ) -> UploadResponse:
-    file_bytes = await file.read()
-    validate_upload(file, file_bytes)
-
-    document_id = uuid.uuid4()
-    storage_path = build_storage_path(str(document_id), file.filename)
-
     try:
-        file_url = upload_file_to_storage(
-            content=file_bytes,
-            destination_path=storage_path,
-            content_type=file.content_type,
-        )
-    except StorageServiceError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=str(exc),
-        ) from exc
-
-    try:
-        document = create_document_record(
-            session=session,
-            filename=file.filename,
-            file_url=file_url,
-            file_size_bytes=len(file_bytes),
-            user_id=user_id,
-            clerk_user_id=current_user.clerk_user_id,
-        )
-    except Exception as exc:
         try:
-            delete_file_from_storage(file_url)
-        except StorageServiceError:
-            pass
+            file_bytes = await file.read()
+            validate_upload(file, file_bytes)
+
+            document_id = uuid.uuid4()
+            storage_path = build_storage_path(str(document_id), file.filename)
+            file_url = upload_file_to_storage(
+                content=file_bytes,
+                destination_path=storage_path,
+                content_type=file.content_type,
+            )
+        except StorageServiceError as exc:
+            logger.exception(
+                "Upload storage failure for file '%s' and user '%s'.",
+                file.filename,
+                current_user.clerk_user_id,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=str(exc),
+            ) from exc
+
+        try:
+            document = create_document_record(
+                session=session,
+                document_id=document_id,
+                filename=file.filename,
+                file_url=file_url,
+                file_size_bytes=len(file_bytes),
+                user_id=user_id,
+                clerk_user_id=current_user.clerk_user_id,
+            )
+        except Exception as exc:
+            logger.exception(
+                "Upload database failure for file '%s', storage path '%s', and user '%s'.",
+                file.filename,
+                file_url,
+                current_user.clerk_user_id,
+            )
+            try:
+                delete_file_from_storage(file_url)
+            except StorageServiceError:
+                logger.warning(
+                    "Upload cleanup failed for storage path '%s' after document creation error.",
+                    file_url,
+                )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to create the document record.",
+            ) from exc
+
+        try:
+            process_document_task.delay(str(document.id))
+        except Exception as exc:
+            logger.exception(
+                "Upload queue failure for document '%s' and user '%s'.",
+                document.id,
+                current_user.clerk_user_id,
+            )
+            update_document_status(
+                session=session,
+                document=document,
+                status=DocumentStatus.FAILED,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Document was saved, but background processing could not be queued.",
+            ) from exc
+
+        return UploadResponse(
+            document_id=document.id,
+            status=document.status.value,
+            file_url=document.file_url,
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception(
+            "Unexpected upload failure for file '%s' and user '%s'.",
+            file.filename,
+            current_user.clerk_user_id,
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to create the document record.",
+            detail="Upload failed unexpectedly. Check backend logs.",
         ) from exc
-
-    try:
-        process_document_task.delay(str(document.id))
-    except Exception as exc:
-        update_document_status(
-            session=session,
-            document=document,
-            status=DocumentStatus.FAILED,
-        )
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Document was saved, but background processing could not be queued.",
-        ) from exc
-
-    return UploadResponse(
-        document_id=document.id,
-        status=document.status.value,
-        file_url=document.file_url,
-    )

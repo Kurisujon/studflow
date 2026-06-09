@@ -24,10 +24,11 @@ def create_document_record(
     filename: str,
     file_url: str,
     file_size_bytes: int,
+    document_id: uuid.UUID | None = None,
     user_id: uuid.UUID | None = None,
     clerk_user_id: str | None = None,
 ) -> Document:
-    document = Document(
+    document_data = dict(
         user_id=user_id,
         clerk_user_id=clerk_user_id,
         filename=filename,
@@ -35,6 +36,10 @@ def create_document_record(
         status=DocumentStatus.PENDING,
         file_size_bytes=file_size_bytes,
     )
+    if document_id is not None:
+        document_data["id"] = document_id
+
+    document = Document(**document_data)
     session.add(document)
     session.commit()
     session.refresh(document)

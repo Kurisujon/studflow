@@ -75,7 +75,12 @@ export type StudyNote = {
   updatedAt: string;
 };
 
-export type AIContextSource = "selection" | "note" | "general";
+export type AIContextSource =
+  | "selection"
+  | "highlight"
+  | "underline"
+  | "note"
+  | "general";
 
 export type StudyAIContext = {
   source: AIContextSource;
@@ -87,10 +92,11 @@ export type AIHistoryItem = {
   id: string;
   documentId: string;
   source: AIContextSource;
-  sourceText: string;
+  sourceText?: string | null;
   noteContent?: string | null;
-  question: string;
+  question?: string | null;
   mode: AIToolMode;
   answer: string;
   createdAt: string;
+  updatedAt: string;
 };

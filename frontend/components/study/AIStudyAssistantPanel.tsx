@@ -1,9 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 
 import { Button } from "@/components/ui/button";
-import { getAIHistory } from "@/lib/api/ai-history";
+import {
+  createAIHistory,
+  deleteAIHistory,
+  getAIHistory,
+} from "@/lib/api/ai-history";
 import { askAIAboutSelection } from "@/lib/api/annotations";
 import type {
   AIExplanation,
@@ -12,6 +16,82 @@ import type {
   StudyAIContext,
 } from "@/types/annotations";
 import { useAuth } from "@clerk/nextjs";
+
+const SOURCE_LABELS: Record<StudyAIContext["source"], string> = {
+  selection: "Selection",
+  highlight: "Highlight",
+  underline: "Underline",
+  note: "Note",
+  general: "General",
+};
+
+const MODE_LABELS: Record<AIToolMode, string> = {
+  "ask-ai": "Ask AI",
+  simplify: "Simplify",
+  "define-term": "Define Term",
+};
+
+function defaultQuestionForMode(mode: AIToolMode) {
+  if (mode === "simplify") {
+    return "Explain this in simpler terms.";
+  }
+
+  if (mode === "define-term") {
+    return "Define this term clearly and explain how it is used in this study topic.";
+  }
+
+  return "Explain this clearly and simply for a student.";
+}
+
+function getHistorySourceText(context: StudyAIContext) {
+  const selectedText = context.selectedText.trim();
+  if (context.source === "general") {
+    return undefined;
+  }
+  if (context.source === "note") {
+    return selectedText || "General note";
+  }
+  return selectedText || undefined;
+}
+
+function getRequestSelectedText(item: AIHistoryItem | null, context: StudyAIContext) {
+  if (!item) {
+    return context.selectedText;
+  }
+
+  if (item.source === "note" && item.sourceText === "General note") {
+    return "";
+  }
+
+  return item.sourceText ?? "";
+}
+
+function toSavedSessionResponse(item: AIHistoryItem): AIExplanation {
+  return {
+    historyId: item.id,
+    selectedText: item.sourceText ?? "",
+    simplifiedExplanation: item.answer,
+    beginnerExplanation: item.answer,
+    example: "",
+    relatedTerms: [],
+    suggestedFlashcard: {
+      front: item.question ?? MODE_LABELS[item.mode],
+      back: item.answer,
+    },
+  };
+}
+
+function truncate(value: string, maxLength: number) {
+  if (value.length <= maxLength) {
+    return value;
+  }
+
+  return `${value.slice(0, maxLength).trimEnd()}...`;
+}
+
+function formatQuestionLabel(item: AIHistoryItem) {
+  return item.question?.trim() || MODE_LABELS[item.mode];
+}
 
 export function AIStudyAssistantPanel({
   documentId,
@@ -26,13 +106,26 @@ export function AIStudyAssistantPanel({
 }) {
   const [question, setQuestion] = useState(initialQuestion ?? "");
   const [loading, setLoading] = useState(false);
-  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [historySearch, setHistorySearch] = useState("");
+  const [historyActionError, setHistoryActionError] = useState<string | null>(null);
+  const [deletingHistoryId, setDeletingHistoryId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [response, setResponse] = useState<AIExplanation | null>(null);
   const [history, setHistory] = useState<AIHistoryItem[]>([]);
   const [loadedHistoryItem, setLoadedHistoryItem] = useState<AIHistoryItem | null>(null);
+  const [activeMode, setActiveMode] = useState<AIToolMode>(mode);
   const questionRef = useRef<HTMLTextAreaElement | null>(null);
   const { getToken } = useAuth();
+
+  useEffect(() => {
+    setQuestion(initialQuestion ?? "");
+    setLoadedHistoryItem(null);
+    setResponse(null);
+    setError(null);
+    setHistoryActionError(null);
+    setActiveMode(mode);
+  }, [context.noteContent, context.selectedText, context.source, initialQuestion, mode]);
 
   useEffect(() => {
     if (context.source === "note") {
@@ -42,17 +135,26 @@ export function AIStudyAssistantPanel({
 
   useEffect(() => {
     let mounted = true;
-    getToken()
-      .then((token) => getAIHistory(documentId, token))
-      .then((items) => {
-        if (mounted) setHistory(items);
-      })
-      .catch((historyError) => {
+
+    async function loadHistory() {
+      setHistoryLoading(true);
+      try {
+        const token = await getToken({ skipCache: true });
+        const items = await getAIHistory(documentId, token);
+        if (mounted) {
+          setHistory(items);
+        }
+      } catch (historyError) {
         console.error(historyError);
-      })
-      .finally(() => {
-        if (mounted) setHistoryLoading(false);
-      });
+      } finally {
+        if (mounted) {
+          setHistoryLoading(false);
+        }
+      }
+    }
+
+    void loadHistory();
+
     return () => {
       mounted = false;
     };
@@ -61,78 +163,224 @@ export function AIStudyAssistantPanel({
   const displayedContext = loadedHistoryItem
     ? {
         source: loadedHistoryItem.source,
-        selectedText: loadedHistoryItem.sourceText,
+        selectedText:
+          loadedHistoryItem.source === "note" &&
+          loadedHistoryItem.sourceText === "General note"
+            ? ""
+            : loadedHistoryItem.sourceText ?? "",
         noteContent: loadedHistoryItem.noteContent ?? undefined,
       }
     : context;
-  const hasContext = Boolean(context.selectedText || context.noteContent);
+  const hasContext = Boolean(
+    displayedContext.selectedText.trim() || displayedContext.noteContent?.trim(),
+  );
   const placeholder =
-    context.source === "note"
+    displayedContext.source === "note"
       ? "Ask something about this note..."
       : "Ask something about this text...";
+  const searchValue = historySearch.trim().toLowerCase();
+  const safeHistory = Array.isArray(history) ? history : [];
+  const filteredHistory = safeHistory.filter((item) => {
+    if (!searchValue) {
+      return true;
+    }
 
-  async function refreshHistory() {
-    const token = await getToken();
-    setHistory(await getAIHistory(documentId, token));
+    const haystack = [
+      item.sourceText ?? "",
+      item.noteContent ?? "",
+      item.question ?? "",
+      item.answer,
+      item.mode,
+      SOURCE_LABELS[item.source],
+    ]
+      .join(" ")
+      .toLowerCase();
+
+    return haystack.includes(searchValue);
+  });
+
+  function resetToNewQuestion() {
+    setLoadedHistoryItem(null);
+    setResponse(null);
+    setError(null);
+    setHistoryActionError(null);
+    setActiveMode(mode);
+    setQuestion(initialQuestion ?? "");
+    questionRef.current?.focus();
   }
 
-  async function submit(customQuestion: string, requestedMode: AIToolMode = mode) {
+  async function submit(
+    customQuestion: string,
+    requestedMode: AIToolMode = activeMode,
+  ) {
     if (!hasContext) return;
 
-    const resolvedQuestion = customQuestion || "Explain this clearly and simply for a student.";
+    const resolvedQuestion =
+      customQuestion.trim() || defaultQuestionForMode(requestedMode);
+    const requestContext = loadedHistoryItem
+      ? {
+          source: loadedHistoryItem.source,
+          selectedText: getRequestSelectedText(loadedHistoryItem, displayedContext),
+          noteContent: loadedHistoryItem.noteContent ?? undefined,
+        }
+      : displayedContext;
+
+    setActiveMode(requestedMode);
     setLoading(true);
     setError(null);
+    setHistoryActionError(null);
+
     try {
-      const token = await getToken();
+      const token = await getToken({ skipCache: true });
       const payload = await askAIAboutSelection(
         documentId,
-        context.selectedText,
+        requestContext.selectedText,
         resolvedQuestion,
         token,
         {
-          noteContent: context.noteContent,
-          source: context.source,
+          noteContent: requestContext.noteContent,
+          source: requestContext.source,
           mode: requestedMode,
         },
       );
-      setResponse(payload);
+
+      setQuestion(resolvedQuestion);
       setLoadedHistoryItem(null);
-      await refreshHistory();
+      setResponse(payload);
+
+      const shouldPersistQuestion =
+        resolvedQuestion.trim() !== defaultQuestionForMode(requestedMode).trim();
+
+      try {
+        const savedHistory = await createAIHistory(
+          documentId,
+          {
+            source: requestContext.source,
+            sourceText: getHistorySourceText(requestContext),
+            noteContent: requestContext.noteContent,
+            question: shouldPersistQuestion ? resolvedQuestion : undefined,
+            mode: requestedMode,
+            answer: payload.simplifiedExplanation,
+          },
+          token,
+        );
+
+        setHistory((current) => [
+          savedHistory,
+          ...current.filter((item) => item.id !== savedHistory.id),
+        ]);
+      } catch (historySaveError) {
+        console.warn("AI history could not be saved.", historySaveError);
+      }
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "AI explanation failed.");
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : "AI explanation failed.",
+      );
     } finally {
       setLoading(false);
     }
   }
 
   function loadHistoryItem(item: AIHistoryItem) {
-    setQuestion(item.question);
+    setQuestion(item.question ?? "");
     setLoadedHistoryItem(item);
-    setResponse({
-      historyId: item.id,
-      selectedText: item.sourceText,
-      simplifiedExplanation: item.answer,
-      beginnerExplanation: item.answer,
-      example: "",
-      relatedTerms: [],
-      suggestedFlashcard: {
-        front: item.question,
-        back: item.answer,
-      },
-    });
+    setActiveMode(item.mode);
+    setError(null);
+    setHistoryActionError(null);
+    setResponse(toSavedSessionResponse(item));
+  }
+
+  async function handleDeleteHistory(
+    event: MouseEvent<HTMLButtonElement>,
+    historyId: string,
+  ) {
+    event.stopPropagation();
+    setDeletingHistoryId(historyId);
+    setHistoryActionError(null);
+
+    try {
+      const token = await getToken({ skipCache: true });
+      await deleteAIHistory(historyId, token);
+      setHistory((current) => current.filter((item) => item.id !== historyId));
+      if (loadedHistoryItem?.id === historyId) {
+        resetToNewQuestion();
+      }
+    } catch (deleteError) {
+      console.error(deleteError);
+      setHistoryActionError("History item could not be deleted.");
+    } finally {
+      setDeletingHistoryId(null);
+    }
   }
 
   return (
     <div style={{ display: "grid", gap: "1rem" }}>
-      <div style={{ padding: "1rem", borderRadius: "18px", backgroundColor: "var(--card)", border: "1px solid var(--theme-border)" }}>
-        <p style={{ fontSize: "0.75rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--theme-primary)", marginBottom: "0.45rem" }}>
-          {loadedHistoryItem ? "Context from history" : displayedContext.source === "note" ? "Context from note" : "Context"}
+      <div
+        style={{
+          padding: "1rem",
+          borderRadius: "18px",
+          backgroundColor: "var(--card)",
+          border: "1px solid var(--theme-border)",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "0.75rem",
+            marginBottom: "0.45rem",
+            flexWrap: "wrap",
+          }}
+        >
+          <p
+            style={{
+              fontSize: "0.75rem",
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              color: "var(--theme-primary)",
+            }}
+          >
+            {loadedHistoryItem
+              ? "Viewing saved AI session"
+              : displayedContext.source === "note"
+                ? "Context from note"
+                : "Context"}
+          </p>
+          {loadedHistoryItem ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={resetToNewQuestion}
+              style={{
+                minHeight: "34px",
+                paddingInline: "12px",
+                borderRadius: "12px",
+              }}
+            >
+              New question
+            </Button>
+          ) : null}
+        </div>
+        <p
+          style={{
+            fontSize: "0.78rem",
+            color: "var(--theme-primary)",
+            marginBottom: "0.65rem",
+            fontWeight: 600,
+          }}
+        >
+          {SOURCE_LABELS[displayedContext.source]}
         </p>
         {displayedContext.source === "note" ? (
           <div style={{ display: "grid", gap: "0.55rem" }}>
             <p style={{ color: "var(--muted-foreground)", lineHeight: 1.6 }}>
               <strong>Selected text:</strong>{" "}
-              {displayedContext.selectedText ? `“${displayedContext.selectedText}”` : "General note"}
+              {displayedContext.selectedText
+                ? `“${displayedContext.selectedText}”`
+                : "General note"}
             </p>
             <p style={{ color: "var(--muted-foreground)", lineHeight: 1.6 }}>
               <strong>Your note:</strong> {displayedContext.noteContent}
@@ -140,25 +388,65 @@ export function AIStudyAssistantPanel({
           </div>
         ) : (
           <p style={{ color: "var(--muted-foreground)" }}>
-            {displayedContext.selectedText ? `“${displayedContext.selectedText}”` : "Select text in the reader to ask the AI tool."}
+            {displayedContext.selectedText
+              ? `“${displayedContext.selectedText}”`
+              : "Select text in the reader to ask the AI tool."}
           </p>
         )}
       </div>
 
       <div style={{ display: "flex", gap: "0.65rem", flexWrap: "wrap" }}>
-        <Button variant={mode === "ask-ai" ? "default" : "outline"} onClick={() => submit(question || "Explain this clearly and simply for a student.", "ask-ai")} disabled={!hasContext || loading} style={{ minHeight: "42px", paddingInline: "16px", borderRadius: "14px" }}>
+        <Button
+          variant={activeMode === "ask-ai" ? "default" : "outline"}
+          onClick={() =>
+            submit(question || defaultQuestionForMode("ask-ai"), "ask-ai")
+          }
+          disabled={!hasContext || loading}
+          style={{
+            minHeight: "42px",
+            paddingInline: "16px",
+            borderRadius: "14px",
+          }}
+        >
           Ask AI
         </Button>
-        <Button variant={mode === "simplify" ? "default" : "outline"} onClick={() => submit("Explain this in simpler terms.", "simplify")} disabled={!hasContext || loading} style={{ minHeight: "42px", paddingInline: "16px", borderRadius: "14px" }}>
+        <Button
+          variant={activeMode === "simplify" ? "default" : "outline"}
+          onClick={() => submit(defaultQuestionForMode("simplify"), "simplify")}
+          disabled={!hasContext || loading}
+          style={{
+            minHeight: "42px",
+            paddingInline: "16px",
+            borderRadius: "14px",
+          }}
+        >
           Simplify
         </Button>
-        <Button variant={mode === "define-term" ? "default" : "outline"} onClick={() => submit("Define this term clearly and explain how it is used in this study topic.", "define-term")} disabled={!hasContext || loading} style={{ minHeight: "42px", paddingInline: "16px", borderRadius: "14px" }}>
+        <Button
+          variant={activeMode === "define-term" ? "default" : "outline"}
+          onClick={() =>
+            submit(defaultQuestionForMode("define-term"), "define-term")
+          }
+          disabled={!hasContext || loading}
+          style={{
+            minHeight: "42px",
+            paddingInline: "16px",
+            borderRadius: "14px",
+          }}
+        >
           Define Term
         </Button>
       </div>
 
       <label style={{ display: "grid", gap: "0.45rem" }}>
-        <span style={{ fontSize: "0.75rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--theme-primary)" }}>
+        <span
+          style={{
+            fontSize: "0.75rem",
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
+            color: "var(--theme-primary)",
+          }}
+        >
           Ask your question
         </span>
         <textarea
@@ -178,40 +466,102 @@ export function AIStudyAssistantPanel({
         />
       </label>
 
-      <Button onClick={() => submit(question)} disabled={!hasContext || loading} style={{ minHeight: "42px", paddingInline: "18px", borderRadius: "14px" }}>
+      <Button
+        onClick={() => submit(question)}
+        disabled={!hasContext || loading}
+        style={{ minHeight: "42px", paddingInline: "18px", borderRadius: "14px" }}
+      >
         {loading ? "Running AI..." : "Run AI"}
       </Button>
 
-      {error ? <p style={{ color: "#b42318", fontSize: "0.92rem" }}>{error}</p> : null}
+      {error ? (
+        <p style={{ color: "#b42318", fontSize: "0.92rem" }}>{error}</p>
+      ) : null}
 
       {response ? (
         <div style={{ display: "grid", gap: "1rem" }}>
-          <div style={{ padding: "1rem", borderRadius: "18px", backgroundColor: "var(--card)", border: "1px solid var(--theme-border)" }}>
-            <p style={{ fontSize: "0.75rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--theme-primary)", marginBottom: "0.45rem" }}>
-              {mode === "define-term" ? "Definition and Usage" : mode === "simplify" ? "Simplified Explanation" : "Response"}
+          <div
+            style={{
+              padding: "1rem",
+              borderRadius: "18px",
+              backgroundColor: "var(--card)",
+              border: "1px solid var(--theme-border)",
+            }}
+          >
+            <p
+              style={{
+                fontSize: "0.75rem",
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                color: "var(--theme-primary)",
+                marginBottom: "0.45rem",
+              }}
+            >
+              {activeMode === "define-term"
+                ? "Definition and Usage"
+                : activeMode === "simplify"
+                  ? "Simplified Explanation"
+                  : "Response"}
             </p>
             <p style={{ color: "var(--foreground)", lineHeight: 1.8 }}>
               {response.simplifiedExplanation}
             </p>
           </div>
 
-          {mode === "ask-ai" && response.example ? (
-            <div style={{ padding: "1rem", borderRadius: "18px", backgroundColor: "var(--card)", border: "1px solid var(--theme-border)" }}>
-              <p style={{ fontSize: "0.75rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--theme-primary)", marginBottom: "0.45rem" }}>
+          {activeMode === "ask-ai" && response.example ? (
+            <div
+              style={{
+                padding: "1rem",
+                borderRadius: "18px",
+                backgroundColor: "var(--card)",
+                border: "1px solid var(--theme-border)",
+              }}
+            >
+              <p
+                style={{
+                  fontSize: "0.75rem",
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  color: "var(--theme-primary)",
+                  marginBottom: "0.45rem",
+                }}
+              >
                 Example
               </p>
-              <p style={{ color: "var(--foreground)", lineHeight: 1.8 }}>{response.example}</p>
+              <p style={{ color: "var(--foreground)", lineHeight: 1.8 }}>
+                {response.example}
+              </p>
             </div>
           ) : null}
 
-          {mode === "ask-ai" && response.relatedTerms.length > 0 ? (
-            <div style={{ padding: "1rem", borderRadius: "18px", backgroundColor: "var(--theme-soft)", border: "1px solid var(--theme-border)" }}>
-              <p style={{ fontSize: "0.75rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--theme-primary)", marginBottom: "0.45rem" }}>
+          {activeMode === "ask-ai" && response.relatedTerms.length > 0 ? (
+            <div
+              style={{
+                padding: "1rem",
+                borderRadius: "18px",
+                backgroundColor: "var(--theme-soft)",
+                border: "1px solid var(--theme-border)",
+              }}
+            >
+              <p
+                style={{
+                  fontSize: "0.75rem",
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  color: "var(--theme-primary)",
+                  marginBottom: "0.45rem",
+                }}
+              >
                 Related Terms
               </p>
-              <ul style={{ display: "grid", gap: "0.55rem", paddingLeft: "1rem" }}>
+              <ul
+                style={{ display: "grid", gap: "0.55rem", paddingLeft: "1rem" }}
+              >
                 {response.relatedTerms.map((term, index) => (
-                  <li key={`related-${index}`} style={{ color: "var(--distill-text-secondary)" }}>
+                  <li
+                    key={`related-${index}`}
+                    style={{ color: "var(--distill-text-secondary)" }}
+                  >
                     {term}
                   </li>
                 ))}
@@ -221,38 +571,238 @@ export function AIStudyAssistantPanel({
         </div>
       ) : null}
 
-      <div style={{ display: "grid", gap: "0.7rem", paddingTop: "0.8rem", borderTop: "1px solid var(--theme-border)" }}>
-        <p style={{ fontSize: "0.75rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--theme-primary)" }}>
-          Recent AI History
-        </p>
+      <div
+        style={{
+          display: "grid",
+          gap: "0.7rem",
+          paddingTop: "0.8rem",
+          borderTop: "1px solid var(--theme-border)",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "0.75rem",
+            flexWrap: "wrap",
+          }}
+        >
+          <p
+            style={{
+              fontSize: "0.75rem",
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              color: "var(--theme-primary)",
+            }}
+          >
+            Recent AI History {safeHistory.length > 0 ? `(${safeHistory.length})` : ""}
+          </p>
+          <input
+            value={historySearch}
+            onChange={(event) => setHistorySearch(event.target.value)}
+            placeholder="Search AI history..."
+            style={{
+              width: "100%",
+              maxWidth: "190px",
+              minHeight: "38px",
+              borderRadius: "12px",
+              border: "1px solid var(--theme-border)",
+              paddingInline: "12px",
+              backgroundColor: "var(--card)",
+              color: "var(--foreground)",
+            }}
+          />
+        </div>
+
+        {historyActionError ? (
+          <p style={{ color: "#b42318", fontSize: "0.86rem" }}>
+            {historyActionError}
+          </p>
+        ) : null}
+
         {historyLoading ? (
-          <p style={{ color: "var(--muted-foreground)", fontSize: "0.9rem" }}>Loading history...</p>
-        ) : history.length === 0 ? (
-          <p style={{ color: "var(--muted-foreground)", fontSize: "0.9rem" }}>No AI history yet.</p>
-        ) : (
-          history.slice(0, 8).map((item) => (
-            <button
-              type="button"
-              key={item.id}
-              onClick={() => loadHistoryItem(item)}
+          <p style={{ color: "var(--muted-foreground)", fontSize: "0.9rem" }}>
+            Loading history...
+          </p>
+        ) : safeHistory.length === 0 ? (
+          <div
+            style={{
+              padding: "1rem",
+              borderRadius: "16px",
+              border: "1px solid var(--theme-border)",
+              backgroundColor: "var(--card)",
+            }}
+          >
+            <p style={{ color: "var(--muted-foreground)", fontSize: "0.9rem" }}>
+              No AI history yet.
+            </p>
+            <p
               style={{
-                textAlign: "left",
-                padding: "0.85rem",
-                borderRadius: "16px",
-                border: "1px solid var(--theme-border)",
-                backgroundColor: "var(--card)",
-                cursor: "pointer",
+                color: "var(--muted-foreground)",
+                fontSize: "0.85rem",
+                lineHeight: 1.6,
+                marginTop: "0.35rem",
               }}
             >
-              <p style={{ color: "var(--foreground)", fontWeight: 650, marginBottom: "0.3rem" }}>{item.question}</p>
-              <p style={{ color: "var(--muted-foreground)", fontSize: "0.86rem", lineHeight: 1.5, marginBottom: "0.35rem" }}>
-                {item.answer.slice(0, 120)}{item.answer.length > 120 ? "..." : ""}
-              </p>
-              <p style={{ color: "var(--theme-primary)", fontSize: "0.78rem" }}>
-                {item.source === "note" ? "Note" : item.source === "selection" ? "Selection" : "General"} - {new Date(item.createdAt).toLocaleString()}
-              </p>
-            </button>
-          ))
+              Ask AI about a selected word, phrase, or note and it will appear
+              here.
+            </p>
+          </div>
+        ) : filteredHistory.length === 0 ? (
+          <div
+            style={{
+              padding: "1rem",
+              borderRadius: "16px",
+              border: "1px solid var(--theme-border)",
+              backgroundColor: "var(--card)",
+            }}
+          >
+            <p style={{ color: "var(--muted-foreground)", fontSize: "0.9rem" }}>
+              No saved AI sessions match that search.
+            </p>
+          </div>
+        ) : (
+          <div
+            style={{
+              display: "grid",
+              gap: "0.7rem",
+              maxHeight: "320px",
+              overflowY: "auto",
+              paddingRight: "0.1rem",
+            }}
+          >
+            {filteredHistory.map((item) => {
+              const isActive = loadedHistoryItem?.id === item.id;
+              const contextPreview =
+                item.sourceText ?? (item.source === "note" ? "General note" : "");
+
+              return (
+                <div
+                  key={item.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => loadHistoryItem(item)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      loadHistoryItem(item);
+                    }
+                  }}
+                  style={{
+                    textAlign: "left",
+                    padding: "0.9rem",
+                    borderRadius: "16px",
+                    border: isActive
+                      ? "1px solid var(--theme-primary)"
+                      : "1px solid var(--theme-border)",
+                    backgroundColor: isActive ? "var(--theme-soft)" : "var(--card)",
+                    cursor: "pointer",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      justifyContent: "space-between",
+                      gap: "0.75rem",
+                    }}
+                  >
+                    <div style={{ display: "grid", gap: "0.35rem", flex: 1 }}>
+                      <p
+                        style={{
+                          color: "var(--theme-primary)",
+                          fontSize: "0.74rem",
+                          letterSpacing: "0.08em",
+                          textTransform: "uppercase",
+                        }}
+                      >
+                        {SOURCE_LABELS[item.source]}
+                      </p>
+                      {contextPreview ? (
+                        <p
+                          style={{
+                            color: "var(--foreground)",
+                            fontWeight: 600,
+                            lineHeight: 1.45,
+                          }}
+                        >
+                          {item.source === "note" && contextPreview === "General note"
+                            ? contextPreview
+                            : `“${truncate(contextPreview, 90)}”`}
+                        </p>
+                      ) : null}
+                      {item.noteContent ? (
+                        <p
+                          style={{
+                            color: "var(--muted-foreground)",
+                            fontSize: "0.82rem",
+                            lineHeight: 1.5,
+                          }}
+                        >
+                          Note: {truncate(item.noteContent, 96)}
+                        </p>
+                      ) : null}
+                    </div>
+                    <button
+                      type="button"
+                      aria-label="Delete AI history item"
+                      onClick={(event) => void handleDeleteHistory(event, item.id)}
+                      disabled={deletingHistoryId === item.id}
+                      style={{
+                        minWidth: "60px",
+                        height: "32px",
+                        paddingInline: "0.7rem",
+                        borderRadius: "10px",
+                        border: "1px solid var(--theme-border)",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        backgroundColor: "transparent",
+                        color: "var(--muted-foreground)",
+                        cursor:
+                          deletingHistoryId === item.id ? "wait" : "pointer",
+                        flexShrink: 0,
+                        fontSize: "0.78rem",
+                        fontWeight: 600,
+                      }}
+                    >
+                      {deletingHistoryId === item.id ? "..." : "Delete"}
+                    </button>
+                  </div>
+
+                  <div style={{ display: "grid", gap: "0.35rem", marginTop: "0.7rem" }}>
+                    <p
+                      style={{
+                        color: "var(--foreground)",
+                        fontSize: "0.86rem",
+                        fontWeight: 600,
+                      }}
+                    >
+                      {formatQuestionLabel(item)}
+                    </p>
+                    <p
+                      style={{
+                        color: "var(--muted-foreground)",
+                        fontSize: "0.86rem",
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      {truncate(item.answer, 140)}
+                    </p>
+                    <p
+                      style={{
+                        color: "var(--theme-primary)",
+                        fontSize: "0.78rem",
+                      }}
+                    >
+                      Updated {new Date(item.updatedAt).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
     </div>

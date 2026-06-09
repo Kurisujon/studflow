@@ -291,13 +291,14 @@ class AIHistory(SQLModel, table=True):
     document_id: uuid.UUID = Field(
         foreign_key="documents.id", nullable=False, index=True
     )
-    source: str = Field(nullable=False)  # selection, note, general
+    source: str = Field(nullable=False)  # selection, highlight, underline, note, general
     source_text: str = Field(default="", nullable=False)
     note_content: Optional[str] = Field(default=None)
     question: str = Field(nullable=False)
     mode: str = Field(nullable=False)
     answer: str = Field(nullable=False)
     created_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
+    updated_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
 
     # Relationships
     document: Optional[Document] = Relationship(back_populates="ai_history_items")

@@ -12,17 +12,24 @@ from sqlmodel import Session, select
 from core.database import engine
 from core.auth import get_current_user, CurrentUser
 from models.tables import (
+    AIHistory,
     Document,
     DocumentChunk,
     DocumentStatus,
     Flashcard,
-    AIHistory,
     Quiz,
     QuizQuestion,
     Summary,
     StudyAnnotation,
 )
-from services.ai_service import ComprehensiveSummary, explain_selection
+from schemas.ai_history import (
+    AIHistoryListResponse,
+    AIHistoryMode,
+    AIHistoryResponse,
+    AIHistorySource,
+    CreateAIHistoryRequest,
+)
+from services.ai_service import AIServiceError, ComprehensiveSummary, explain_selection
 
 router = APIRouter()
 
@@ -87,8 +94,8 @@ class ExplainSelectionRequest(BaseModel):
     question: str | None = None
     documentId: uuid.UUID | None = None
     noteContent: str | None = None
-    source: Literal["selection", "note", "general"] = "selection"
-    mode: Literal["ask-ai", "simplify", "define-term"] = "ask-ai"
+    source: AIHistorySource = "selection"
+    mode: AIHistoryMode = "ask-ai"
 
 
 class ExplainSelectionResponse(BaseModel):
@@ -146,27 +153,6 @@ class UpdateAnnotationRequest(BaseModel):
     noteContent: str | None = None
 
 
-class AIHistoryResponse(BaseModel):
-    id: uuid.UUID
-    documentId: str
-    source: Literal["selection", "note", "general"]
-    sourceText: str
-    noteContent: str | None = None
-    question: str
-    mode: Literal["ask-ai", "simplify", "define-term"]
-    answer: str
-    createdAt: datetime
-
-
-class CreateAIHistoryRequest(BaseModel):
-    source: Literal["selection", "note", "general"]
-    sourceText: str = ""
-    noteContent: str | None = None
-    question: str = Field(min_length=1)
-    mode: Literal["ask-ai", "simplify", "define-term"]
-    answer: str = Field(min_length=1)
-
-
 def _get_owned_document(
     session: Session,
     document_id: uuid.UUID,
@@ -217,6 +203,27 @@ def _get_owned_annotation(
     return annotation
 
 
+def _get_owned_ai_history(
+    session: Session,
+    history_id: uuid.UUID,
+    current_user: CurrentUser,
+) -> AIHistory:
+    history = session.exec(
+        select(AIHistory)
+        .join(Document, Document.id == AIHistory.document_id)
+        .where(AIHistory.id == history_id)
+        .where(Document.clerk_user_id == current_user.clerk_user_id)
+    ).first()
+
+    if history is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="AI history item not found.",
+        )
+
+    return history
+
+
 def _to_annotation_response(annotation: StudyAnnotation) -> AnnotationResponse:
     annotation_type = cast(Literal["highlight", "underline", "note"], annotation.type)
 
@@ -238,20 +245,37 @@ def _to_annotation_response(annotation: StudyAnnotation) -> AnnotationResponse:
 
 
 def _to_ai_history_response(history: AIHistory) -> AIHistoryResponse:
-    source = cast(Literal["selection", "note", "general"], history.source)
-    mode = cast(Literal["ask-ai", "simplify", "define-term"], history.mode)
+    source = cast(AIHistorySource, history.source)
+    mode = cast(AIHistoryMode, history.mode)
 
     return AIHistoryResponse(
         id=history.id,
         documentId=str(history.document_id),
         source=source,
-        sourceText=history.source_text,
+        sourceText=history.source_text or None,
         noteContent=history.note_content,
-        question=history.question,
+        question=history.question or None,
         mode=mode,
         answer=history.answer,
         createdAt=history.created_at,
+        updatedAt=history.updated_at,
     )
+
+
+def _raise_ai_http_error(exc: AIServiceError) -> None:
+    cause = exc.__cause__
+    status_code = getattr(cause, "status_code", None) or getattr(cause, "code", None)
+
+    if status_code in {429, 503, 504}:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="AI is temporarily unavailable due to high demand. Please try again in a moment.",
+        ) from exc
+
+    raise HTTPException(
+        status_code=status.HTTP_502_BAD_GATEWAY,
+        detail="AI could not generate a response right now. Please try again.",
+    ) from exc
 
 
 def _infer_processing_stage(document: Document, summary: Summary | None, flashcard_count: int, quiz: Quiz | None) -> str:
@@ -489,36 +513,21 @@ def explain_study_selection(payload: ExplainSelectionRequest, current_user: Curr
         )
 
     with Session(engine) as session:
-        document: Document | None = None
         if payload.documentId is not None:
-            document = _get_owned_document(session, payload.documentId, current_user)
+            _get_owned_document(session, payload.documentId, current_user)
 
-        explanation = explain_selection(
-            highlighted_text=highlighted_text,
-            note_content=note_content,
-            source=payload.source,
-            user_question=(payload.question or "").strip(),
-        )
-
-        history_id: uuid.UUID | None = None
-        if document is not None:
-            history = AIHistory(
-                document_id=document.id,
+        try:
+            explanation = explain_selection(
+                highlighted_text=highlighted_text,
+                note_content=note_content,
                 source=payload.source,
-                source_text=highlighted_text,
-                note_content=note_content or None,
-                question=(payload.question or "Explain this clearly and simply for a student.").strip(),
-                mode=payload.mode,
-                answer=explanation.simplified_explanation,
-                created_at=datetime.utcnow(),
+                user_question=(payload.question or "").strip(),
             )
-            session.add(history)
-            session.commit()
-            session.refresh(history)
-            history_id = history.id
+        except AIServiceError as exc:
+            _raise_ai_http_error(exc)
 
         return ExplainSelectionResponse(
-            historyId=history_id,
+            historyId=None,
             selectedText=explanation.selected_text,
             simplifiedExplanation=explanation.simplified_explanation,
             beginnerExplanation=explanation.beginner_explanation,
@@ -791,36 +800,85 @@ def force_delete_note(note_id: uuid.UUID, current_user: CurrentUser = Depends(ge
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.get("/documents/{document_id}/ai-history", response_model=list[AIHistoryResponse])
-def get_ai_history(document_id: uuid.UUID, current_user: CurrentUser = Depends(get_current_user)) -> list[AIHistoryResponse]:
+@router.get("/documents/{document_id}/ai-history", response_model=AIHistoryListResponse)
+def get_ai_history(
+    document_id: uuid.UUID,
+    current_user: CurrentUser = Depends(get_current_user),
+) -> AIHistoryListResponse:
     with Session(engine) as session:
         _get_owned_document(session, document_id, current_user)
         history_items = session.exec(
             select(AIHistory)
             .where(AIHistory.document_id == document_id)
-            .order_by(AIHistory.created_at.desc())
+            .order_by(AIHistory.updated_at.desc(), AIHistory.created_at.desc())
         ).all()
-        return [_to_ai_history_response(history) for history in history_items]
+        return AIHistoryListResponse(
+            history=[_to_ai_history_response(history) for history in history_items]
+        )
 
 
 @router.post("/documents/{document_id}/ai-history", response_model=AIHistoryResponse)
-def create_ai_history(document_id: uuid.UUID, payload: CreateAIHistoryRequest, current_user: CurrentUser = Depends(get_current_user)) -> AIHistoryResponse:
+def create_ai_history(
+    document_id: uuid.UUID,
+    payload: CreateAIHistoryRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+) -> AIHistoryResponse:
     with Session(engine) as session:
         document = _get_owned_document(session, document_id, current_user)
+        now = datetime.utcnow()
         history = AIHistory(
             document_id=document.id,
             source=payload.source,
-            source_text=payload.sourceText,
+            source_text=payload.sourceText or "",
             note_content=payload.noteContent,
-            question=payload.question,
+            question=payload.question or "",
             mode=payload.mode,
             answer=payload.answer,
-            created_at=datetime.utcnow(),
+            created_at=now,
+            updated_at=now,
         )
         session.add(history)
         session.commit()
         session.refresh(history)
         return _to_ai_history_response(history)
+
+
+@router.delete(
+    "/ai-history/{history_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    response_model=None,
+)
+def delete_ai_history(
+    history_id: uuid.UUID,
+    current_user: CurrentUser = Depends(get_current_user),
+) -> Response:
+    with Session(engine) as session:
+        history = _get_owned_ai_history(session, history_id, current_user)
+        session.delete(history)
+        session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.delete(
+    "/documents/{document_id}/ai-history",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    response_model=None,
+)
+def clear_document_ai_history(
+    document_id: uuid.UUID,
+    current_user: CurrentUser = Depends(get_current_user),
+) -> Response:
+    with Session(engine) as session:
+        _get_owned_document(session, document_id, current_user)
+        history_items = session.exec(
+            select(AIHistory).where(AIHistory.document_id == document_id)
+        ).all()
+        for history in history_items:
+            session.delete(history)
+        session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.delete(
