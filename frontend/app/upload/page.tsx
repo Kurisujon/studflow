@@ -57,17 +57,27 @@ export default function UploadPage() {
   });
 
   useEffect(() => {
-    if (!statusData || (statusData.status !== "COMPLETED" && statusData.status !== "FAILED")) {
+    if (!statusData) {
+      return;
+    }
+
+    if (statusData.status === "COMPLETED") {
+      const completedDocumentId = statusData.document_id;
+      const timeoutId = window.setTimeout(() => {
+        handleTerminalStatus("COMPLETED", completedDocumentId);
+      }, 0);
+
+      return () => {
+        window.clearTimeout(timeoutId);
+      };
+    }
+
+    if (statusData.status !== "FAILED") {
       return;
     }
 
     const timeoutId = window.setTimeout(() => {
-      if (statusData.status === "COMPLETED") {
-        handleTerminalStatus(statusData.status, statusData.document_id);
-        return;
-      }
-
-      handleTerminalStatus(statusData.status);
+      handleTerminalStatus("FAILED");
     }, 0);
 
     return () => {
