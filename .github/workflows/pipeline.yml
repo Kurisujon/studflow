@@ -171,12 +171,6 @@ jobs:
           printf '%s' "$AZURE_VM_SSH_KEY" > "$HOME/.ssh/id_ed25519"
           chmod 600 "$HOME/.ssh/id_ed25519"
 
-      - name: Trust target host
-        env:
-          AZURE_VM_HOST: ${{ secrets.AZURE_VM_HOST }}
-          AZURE_VM_PORT: ${{ secrets.AZURE_VM_PORT }}
-        run: ssh-keyscan -p "${AZURE_VM_PORT:-22}" -H "$AZURE_VM_HOST" >> "$HOME/.ssh/known_hosts"
-
       - name: Write production environment file
         env:
           PRODUCTION_ENV_FILE: ${{ secrets.PRODUCTION_ENV_FILE }}
@@ -194,7 +188,7 @@ jobs:
           AZURE_VM_PORT: ${{ secrets.AZURE_VM_PORT }}
           AZURE_VM_USER: ${{ secrets.AZURE_VM_USER }}
         run: |
-          scp -P "${AZURE_VM_PORT:-22}" release.tgz .env.production \
+          scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -P "${AZURE_VM_PORT:-22}" release.tgz .env.production \
             "${AZURE_VM_USER}@${AZURE_VM_HOST}:/tmp/"
 
       - name: Deploy on Azure VM
@@ -206,7 +200,7 @@ jobs:
           GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
           GHCR_PAT: ${{ secrets.GHCR_PAT }}
         run: |
-          ssh -p "${AZURE_VM_PORT:-22}" "${AZURE_VM_USER}@${AZURE_VM_HOST}" "
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p "${AZURE_VM_PORT:-22}" "${AZURE_VM_USER}@${AZURE_VM_HOST}" "
             APP_PATH='${AZURE_VM_APP_PATH:-/home/${AZURE_VM_USER}/studflow}' &&
             TMP_DEPLOY_DIR=\$(mktemp -d) &&
             mkdir -p \"\$APP_PATH\" &&
