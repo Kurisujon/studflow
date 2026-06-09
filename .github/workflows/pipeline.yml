@@ -90,7 +90,7 @@ jobs:
       - name: Write production environment file
         env:
           PRODUCTION_ENV_FILE: ${{ secrets.PRODUCTION_ENV_FILE }}
-        run: printf '%s' "$PRODUCTION_ENV_FILE" > .env.production
+        run: printf '%s\n' "$PRODUCTION_ENV_FILE" > .env.production
 
       - name: Extract frontend build variables
         id: frontend-env
@@ -181,7 +181,7 @@ jobs:
         env:
           PRODUCTION_ENV_FILE: ${{ secrets.PRODUCTION_ENV_FILE }}
         run: |
-          printf '%s' "$PRODUCTION_ENV_FILE" > .env.production
+          printf '%s\n' "$PRODUCTION_ENV_FILE" > .env.production
           {
             echo "FRONTEND_IMAGE=${{ needs.build-images.outputs.frontend_image }}"
             echo "BACKEND_IMAGE=${{ needs.build-images.outputs.backend_image }}"
