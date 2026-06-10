@@ -74,7 +74,7 @@ export function StudyWorkspace({
     return () => {
       window.removeEventListener("keydown", handleStudyTabShortcuts);
     };
-  }, [currentTab]);
+  }, [currentTab, navigateToTab]);
 
   return (
     <>

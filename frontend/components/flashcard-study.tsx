@@ -26,6 +26,29 @@ export function FlashcardStudy({
     };
   }, []);
 
+  function changeCard(nextIndex: number) {
+    if (nextIndex < 0 || nextIndex >= flashcards.length || isChangingCard) {
+      return;
+    }
+
+    if (cardChangeTimeoutRef.current) {
+      window.clearTimeout(cardChangeTimeoutRef.current);
+    }
+
+    if (!isFlipped) {
+      setActiveIndex(nextIndex);
+      return;
+    }
+
+    setIsChangingCard(true);
+    setIsFlipped(false);
+    cardChangeTimeoutRef.current = window.setTimeout(() => {
+      setActiveIndex(nextIndex);
+      setIsChangingCard(false);
+      cardChangeTimeoutRef.current = null;
+    }, CARD_FLIP_DURATION_MS);
+  }
+
   useEffect(() => {
     function handleFlashcardShortcuts(event: KeyboardEvent) {
       const target = event.target as HTMLElement | null;
@@ -66,7 +89,7 @@ export function FlashcardStudy({
     return () => {
       window.removeEventListener("keydown", handleFlashcardShortcuts);
     };
-  }, [activeIndex, isChangingCard, isFlipped, flashcards.length]);
+  }, [activeIndex, changeCard, isChangingCard]);
 
   if (flashcards.length === 0) {
     return <p>No flashcards available yet.</p>;
@@ -74,29 +97,6 @@ export function FlashcardStudy({
 
   const activeCard = flashcards[activeIndex];
   const progress = ((activeIndex + 1) / flashcards.length) * 100;
-
-  function changeCard(nextIndex: number) {
-    if (nextIndex < 0 || nextIndex >= flashcards.length || isChangingCard) {
-      return;
-    }
-
-    if (cardChangeTimeoutRef.current) {
-      window.clearTimeout(cardChangeTimeoutRef.current);
-    }
-
-    if (!isFlipped) {
-      setActiveIndex(nextIndex);
-      return;
-    }
-
-    setIsChangingCard(true);
-    setIsFlipped(false);
-    cardChangeTimeoutRef.current = window.setTimeout(() => {
-      setActiveIndex(nextIndex);
-      setIsChangingCard(false);
-      cardChangeTimeoutRef.current = null;
-    }, CARD_FLIP_DURATION_MS);
-  }
 
   return (
     <section style={{ width: "100%" }}>

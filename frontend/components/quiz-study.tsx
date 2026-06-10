@@ -56,6 +56,55 @@ export function QuizStudy({
     };
   }, [passed, showScore]);
 
+  useEffect(() => {
+    function handleQuizShortcuts(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      if (
+        event.defaultPrevented ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        (target &&
+          (target.tagName === "INPUT" ||
+            target.tagName === "TEXTAREA" ||
+            target.isContentEditable)) ||
+        showScore ||
+        question === null
+      ) {
+        return;
+      }
+
+      const numericKey = Number.parseInt(event.key, 10);
+      if (!Number.isNaN(numericKey) && numericKey >= 1 && numericKey <= 4) {
+        const optionIndex = numericKey - 1;
+        if (question.options[optionIndex] !== undefined && !answered) {
+          event.preventDefault();
+          setSelectedAnswers((current) => ({
+            ...current,
+            [activeIndex]: optionIndex,
+          }));
+        }
+        return;
+      }
+
+      if (event.key === "Enter" && answered) {
+        event.preventDefault();
+
+        if (activeIndex === questions.length - 1) {
+          setShowScore(true);
+          return;
+        }
+
+        setActiveIndex((current) => current + 1);
+      }
+    }
+
+    window.addEventListener("keydown", handleQuizShortcuts);
+    return () => {
+      window.removeEventListener("keydown", handleQuizShortcuts);
+    };
+  }, [activeIndex, answered, question, questions.length, showScore]);
+
   if (!hasQuestions || question === null) {
     return <p>No quiz available yet.</p>;
   }
@@ -86,49 +135,6 @@ export function QuizStudy({
     setShowScore(false);
     hasCelebratedRef.current = false;
   }
-
-  useEffect(() => {
-    function handleQuizShortcuts(event: KeyboardEvent) {
-      const target = event.target as HTMLElement | null;
-      if (
-        event.defaultPrevented ||
-        event.altKey ||
-        event.ctrlKey ||
-        event.metaKey ||
-        (target &&
-          (target.tagName === "INPUT" ||
-            target.tagName === "TEXTAREA" ||
-            target.isContentEditable)) ||
-        showScore
-      ) {
-        return;
-      }
-
-      if (question === null) {
-        return;
-      }
-
-      const numericKey = Number.parseInt(event.key, 10);
-      if (!Number.isNaN(numericKey) && numericKey >= 1 && numericKey <= 4) {
-        const optionIndex = numericKey - 1;
-        if (question.options[optionIndex] !== undefined) {
-          event.preventDefault();
-          handleSelectOption(optionIndex);
-        }
-        return;
-      }
-
-      if (event.key === "Enter" && answered) {
-        event.preventDefault();
-        handleNext();
-      }
-    }
-
-    window.addEventListener("keydown", handleQuizShortcuts);
-    return () => {
-      window.removeEventListener("keydown", handleQuizShortcuts);
-    };
-  }, [answered, question, showScore, activeIndex, selectedAnswers]);
 
   if (showScore) {
     return (
