@@ -1,4 +1,21 @@
 services:
+  caddy:
+    image: caddy:2-alpine
+    depends_on:
+      frontend:
+        condition: service_started
+    environment:
+      PUBLIC_DOMAIN: ${PUBLIC_DOMAIN}
+      SERVER_IP: ${SERVER_IP}
+    ports:
+      - "80:80"
+      - "443:443"
+    restart: unless-stopped
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
   frontend:
     image: ${FRONTEND_IMAGE:-studflow-frontend:local}
     build:
@@ -24,8 +41,6 @@ services:
     depends_on:
       backend:
         condition: service_healthy
-    ports:
-      - "${APP_PORT:-3000}:3000"
     restart: unless-stopped
 
   backend:
@@ -141,5 +156,7 @@ services:
       - redis_data:/data
 
 volumes:
+  caddy_data:
+  caddy_config:
   postgres_data:
   redis_data:

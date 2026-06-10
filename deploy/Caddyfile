@@ -1,0 +1,7 @@
+http://{$SERVER_IP}, http://{$PUBLIC_DOMAIN} {
+  redir https://{$PUBLIC_DOMAIN}{uri} permanent
+}
+
+https://{$PUBLIC_DOMAIN} {
+  reverse_proxy frontend:3000
+}

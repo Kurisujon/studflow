@@ -16,9 +16,10 @@ The workflow is defined in [.github/workflows/pipeline.yml](/mnt/c/Users/CJK_LAP
 
 The production stack is defined in [docker-compose.yml](/mnt/c/Users/CJK_LAPTOP/Personal_Projects/Javascript/studflow/docker-compose.yml).
 
-It starts five services:
+It starts six services:
 
-- `frontend`: Next.js on port `3000`
+- `caddy`: public reverse proxy on ports `80` and `443`
+- `frontend`: Next.js internal service on port `3000`
 - `backend`: FastAPI internal service on port `8000`
 - `worker`: Celery worker
 - `postgres`: PostgreSQL 16
@@ -26,7 +27,7 @@ It starts five services:
 
 The browser entrypoint is:
 
-- `http://4.145.113.246:3000`
+- `https://webcris.dev`
 
 API requests still go through `/api/...` on the same origin. The frontend proxies those requests to the backend container internally.
 
@@ -46,9 +47,10 @@ Use [.env.production.example](/mnt/c/Users/CJK_LAPTOP/Personal_Projects/Javascri
 
 Important production values for the current server:
 
-- `NEXT_PUBLIC_API_BASE_URL=http://4.145.113.246:3000`
+- `PUBLIC_DOMAIN=webcris.dev`
+- `NEXT_PUBLIC_API_BASE_URL=https://webcris.dev`
 - `INTERNAL_API_BASE_URL=http://backend:8000`
-- `ALLOWED_ORIGINS=["http://4.145.113.246:3000"]`
+- `ALLOWED_ORIGINS=["https://webcris.dev","http://webcris.dev"]`
 - `COMPOSE_BUILD_ON_SERVER=false`
 
 Set real values for:
@@ -98,9 +100,8 @@ The workflow uses the built-in GitHub Actions token to push images to GHCR. The 
 2. Install Docker, Docker Compose plugin, and `rsync`.
 3. Create the application directory, for example `/home/azureuser/studflow`.
 4. Make sure `azureuser` is in the `docker` group or can otherwise run Docker without interactive sudo prompts.
-5. Open port `3000` in the Azure Network Security Group for the VM.
-
-If you want HTTPS later, put Nginx, Caddy, or Azure Application Gateway in front of port `3000`.
+5. Open ports `80` and `443` in the Azure Network Security Group for the VM.
+6. Keep ports `3000`, `8000`, `5432`, and `6379` private.
 
 ## GitHub Flow
 
@@ -133,8 +134,8 @@ bash /home/azureuser/studflow/scripts/deploy.sh
 After deployment, validate:
 
 - `docker compose --env-file .env.production ps`
-- `http://4.145.113.246:3000`
-- `http://4.145.113.246:3000/api/health`
+- `https://webcris.dev`
+- `http://4.145.113.246` should redirect to `https://webcris.dev`
 
 If the API health check fails but the frontend opens, inspect:
 
