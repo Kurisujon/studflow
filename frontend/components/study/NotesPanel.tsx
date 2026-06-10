@@ -18,6 +18,7 @@ export function NotesPanel({
   deletedNotes,
   focusedNoteId,
   composerValue,
+  composerTextareaId,
   selectedTextContext,
   onComposerChange,
   onSaveNote,
@@ -31,6 +32,7 @@ export function NotesPanel({
   deletedNotes: StudyNote[];
   focusedNoteId: string | null;
   composerValue: string;
+  composerTextareaId?: string;
   selectedTextContext: string;
   onComposerChange: (value: string) => void;
   onSaveNote: () => void;
@@ -179,6 +181,7 @@ export function NotesPanel({
         </p>
         <div style={{ display: "flex", gap: "0.6rem", alignItems: "flex-end" }}>
           <textarea
+            id={composerTextareaId}
             value={composerValue}
             onChange={(event) => onComposerChange(event.target.value)}
             onKeyDown={handleKeyDown}

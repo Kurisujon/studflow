@@ -26,6 +26,48 @@ export function FlashcardStudy({
     };
   }, []);
 
+  useEffect(() => {
+    function handleFlashcardShortcuts(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      if (
+        event.defaultPrevented ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        (target &&
+          (target.tagName === "INPUT" ||
+            target.tagName === "TEXTAREA" ||
+            target.isContentEditable))
+      ) {
+        return;
+      }
+
+      if (event.key === " ") {
+        event.preventDefault();
+        if (!isChangingCard) {
+          setIsFlipped((current) => !current);
+        }
+        return;
+      }
+
+      if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        changeCard(activeIndex - 1);
+        return;
+      }
+
+      if (event.key === "ArrowRight") {
+        event.preventDefault();
+        changeCard(activeIndex + 1);
+      }
+    }
+
+    window.addEventListener("keydown", handleFlashcardShortcuts);
+    return () => {
+      window.removeEventListener("keydown", handleFlashcardShortcuts);
+    };
+  }, [activeIndex, isChangingCard, isFlipped, flashcards.length]);
+
   if (flashcards.length === 0) {
     return <p>No flashcards available yet.</p>;
   }

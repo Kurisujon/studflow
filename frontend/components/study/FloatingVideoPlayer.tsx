@@ -252,7 +252,7 @@ export function FloatingVideoPlayer({
             </button>
           </div>
         ) : (
-          <div className="relative flex h-full flex-col overflow-hidden rounded-3xl border border-border bg-card shadow-2xl shadow-black/15">
+          <div className="relative flex h-full flex-col overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-card shadow-2xl shadow-black/15">
             {renderResizeHandle("top", "left-4 top-0 h-2 w-[calc(100%-2rem)] cursor-ns-resize", "Resize video player from top edge")}
             {renderResizeHandle("right", "right-0 top-4 h-[calc(100%-2rem)] w-2 cursor-ew-resize", "Resize video player from right edge")}
             {renderResizeHandle("bottom", "bottom-0 left-4 h-2 w-[calc(100%-2rem)] cursor-ns-resize", "Resize video player from bottom edge")}
@@ -306,7 +306,7 @@ export function FloatingVideoPlayer({
               </div>
             </div>
 
-            <div className="relative z-10 bg-black">
+            <div className="relative z-10 mx-3 mt-3 overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-black">
               <iframe
                 src={`https://www.youtube.com/embed/${video.videoId}`}
                 title={video.title}
@@ -322,10 +322,7 @@ export function FloatingVideoPlayer({
                   {video.relevanceReason}
                 </p>
               ) : null}
-              <div className="flex items-center justify-between gap-3">
-                <p className="line-clamp-1 min-w-0 text-xs leading-4 text-muted-foreground">
-                  {video.channelTitle}
-                </p>
+              <div className="flex items-center justify-end gap-3">
                 <a
                   href={video.url}
                   target="_blank"

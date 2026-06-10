@@ -1,9 +1,4 @@
-import Link from "next/link";
-
-import { FlashcardStudy } from "@/components/flashcard-study";
-import { QuizStudy } from "@/components/quiz-study";
-import { SummaryStudy } from "@/components/summary-study";
-import { Button } from "@/components/ui/button";
+import { StudyWorkspace } from "@/components/study/StudyWorkspace";
 import { fetchStudyDocument } from "@/lib/server-api";
 
 type StudyPageProps = {
@@ -59,60 +54,7 @@ export default async function StudyPage({
           </div>
         </div>
 
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: "0.75rem",
-            marginBottom: "1.5rem",
-          }}
-        >
-          {[
-            { key: "summary", label: "Summary" },
-            { key: "flashcards", label: "Flashcards" },
-            { key: "quiz", label: "Quiz" },
-          ].map((item) => (
-            <Button
-              key={item.key}
-              nativeButton={false}
-              render={<Link href={`/dashboard/study/${id}?tab=${item.key}`} />}
-              variant={tab === item.key ? "default" : "outline"}
-              size="lg"
-              style={{
-                minHeight: "42px",
-                paddingInline: "18px",
-                borderRadius: "999px",
-                color: tab === item.key ? "var(--theme-on-primary)" : "var(--foreground)",
-                backgroundColor: tab === item.key ? "var(--theme-primary)" : "var(--card)",
-                border: tab === item.key ? "1px solid var(--theme-primary)" : "1px solid var(--border)",
-              }}
-            >
-              {item.label}
-            </Button>
-          ))}
-        </div>
-
-        <div
-          style={{
-            padding: "2rem",
-            border: "1px solid var(--theme-border)",
-            borderRadius: "28px",
-            background: "color-mix(in srgb, var(--card) 92%, var(--theme-soft))",
-            boxShadow: "0 22px 60px var(--theme-shadow)",
-          }}
-        >
-          {tab === "flashcards" ? (
-            <FlashcardStudy flashcards={document.flashcards} />
-          ) : null}
-
-          {tab === "quiz" ? (
-            <QuizStudy questions={document.quiz} />
-          ) : null}
-
-          {tab !== "flashcards" && tab !== "quiz" ? (
-            <SummaryStudy documentId={document.id} summary={document.summary_data} />
-          ) : null}
-        </div>
+        <StudyWorkspace document={document} initialTab={tab} />
       </div>
     </section>
   );

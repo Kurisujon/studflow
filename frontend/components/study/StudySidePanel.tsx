@@ -19,6 +19,7 @@ export function StudySidePanel({
   deletedNotes,
   focusedNoteId,
   noteComposerValue,
+  noteComposerTextareaId,
   selectedNoteText,
   onNoteComposerChange,
   onSaveNote,
@@ -40,6 +41,7 @@ export function StudySidePanel({
   deletedNotes: StudyNote[];
   focusedNoteId: string | null;
   noteComposerValue: string;
+  noteComposerTextareaId?: string;
   selectedNoteText: string;
   onNoteComposerChange: (value: string) => void;
   onSaveNote: () => void;
@@ -135,6 +137,7 @@ export function StudySidePanel({
                   deletedNotes={deletedNotes}
                   focusedNoteId={focusedNoteId}
                   composerValue={noteComposerValue}
+                  composerTextareaId={noteComposerTextareaId}
                   selectedTextContext={selectedNoteText}
                   onComposerChange={onNoteComposerChange}
                   onSaveNote={onSaveNote}

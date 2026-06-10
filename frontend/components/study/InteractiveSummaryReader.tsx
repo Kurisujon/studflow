@@ -139,6 +139,7 @@ export function InteractiveSummaryReader({
   documentId: string;
   summary: SummaryData | null;
 }) {
+  const noteComposerTextareaId = `study-note-composer-${documentId}`;
   const [activeIndex, setActiveIndex] = useState(0);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [notes, setNotes] = useState<StudyNote[]>([]);
@@ -264,6 +265,7 @@ export function InteractiveSummaryReader({
     function handleShortcuts(event: KeyboardEvent) {
       const target = event.target as HTMLElement | null;
       if (
+        event.defaultPrevented ||
         target &&
         (target.tagName === "INPUT" ||
           target.tagName === "TEXTAREA" ||
@@ -275,6 +277,34 @@ export function InteractiveSummaryReader({
       if (event.altKey && event.key.toLowerCase() === "m") {
         event.preventDefault();
         setDrawerOpen((current) => !current);
+        return;
+      }
+
+      if (event.ctrlKey || event.metaKey || event.altKey) {
+        return;
+      }
+
+      if (event.key.toLowerCase() === "a") {
+        event.preventDefault();
+        setDrawerOpen(true);
+        setActiveBubbleTab("ai");
+        return;
+      }
+
+      if (event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        setDrawerOpen(true);
+        setActiveBubbleTab("notes");
+        return;
+      }
+
+      if (event.key.toLowerCase() === "n") {
+        event.preventDefault();
+        setDrawerOpen(true);
+        setActiveBubbleTab("notes");
+        window.requestAnimationFrame(() => {
+          document.getElementById(noteComposerTextareaId)?.focus();
+        });
       }
     }
 
@@ -286,7 +316,7 @@ export function InteractiveSummaryReader({
       window.removeEventListener("keydown", handleEscape);
       window.removeEventListener("keydown", handleShortcuts);
     };
-  }, [drawerOpen, pendingSelection]);
+  }, [drawerOpen, noteComposerTextareaId, pendingSelection]);
 
   if (!summary || summary.detailed_sections.length === 0) {
     return <p>No summary available yet.</p>;
@@ -1190,6 +1220,7 @@ export function InteractiveSummaryReader({
         deletedNotes={deletedNotes}
         focusedNoteId={focusedNoteId}
         noteComposerValue={noteComposerValue}
+        noteComposerTextareaId={noteComposerTextareaId}
         selectedNoteText={noteContextText || selectionState?.selectedText || pendingSelection?.selectedText || ""}
         onNoteComposerChange={setNoteComposerValue}
         onSaveNote={saveNote}
