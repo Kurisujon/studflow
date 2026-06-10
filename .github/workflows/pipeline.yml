@@ -188,8 +188,28 @@ jobs:
           AZURE_VM_PORT: ${{ secrets.AZURE_VM_PORT }}
           AZURE_VM_USER: ${{ secrets.AZURE_VM_USER }}
         run: |
-          scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -P "${AZURE_VM_PORT:-22}" release.tgz .env.production \
-            "${AZURE_VM_USER}@${AZURE_VM_HOST}:/tmp/"
+          scp_args=(
+            -o StrictHostKeyChecking=no
+            -o UserKnownHostsFile=/dev/null
+            -o ConnectTimeout=10
+            -o ConnectionAttempts=3
+            -P "${AZURE_VM_PORT:-22}"
+          )
+
+          for attempt in 1 2 3 4 5; do
+            if scp "${scp_args[@]}" release.tgz .env.production \
+              "${AZURE_VM_USER}@${AZURE_VM_HOST}:/tmp/"; then
+              exit 0
+            fi
+
+            if [ "$attempt" -eq 5 ]; then
+              echo "Release upload failed after ${attempt} attempts." >&2
+              exit 1
+            fi
+
+            echo "Release upload attempt ${attempt} failed. Retrying in 15 seconds..." >&2
+            sleep 15
+          done
 
       - name: Deploy on Azure VM
         env:
@@ -200,7 +220,15 @@ jobs:
           GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
           GHCR_PAT: ${{ secrets.GHCR_PAT }}
         run: |
-          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p "${AZURE_VM_PORT:-22}" "${AZURE_VM_USER}@${AZURE_VM_HOST}" "
+          ssh_args=(
+            -o StrictHostKeyChecking=no
+            -o UserKnownHostsFile=/dev/null
+            -o ConnectTimeout=10
+            -o ConnectionAttempts=3
+            -p "${AZURE_VM_PORT:-22}"
+          )
+
+          remote_command="
             APP_PATH='${AZURE_VM_APP_PATH:-/home/${AZURE_VM_USER}/studflow}' &&
             TMP_DEPLOY_DIR=\$(mktemp -d) &&
             mkdir -p \"\$APP_PATH\" &&
@@ -209,3 +237,17 @@ jobs:
             GHCR_USERNAME='${GHCR_USERNAME}' GHCR_TOKEN='${GHCR_PAT}' APP_DIR=\"\$APP_PATH\" ARCHIVE_PATH=/tmp/release.tgz ENV_PATH=\"\$APP_PATH/.env.production\" bash \"\$TMP_DEPLOY_DIR/scripts/deploy.sh\" &&
             rm -rf \"\$TMP_DEPLOY_DIR\"
           "
+
+          for attempt in 1 2 3 4 5; do
+            if ssh "${ssh_args[@]}" "${AZURE_VM_USER}@${AZURE_VM_HOST}" "$remote_command"; then
+              exit 0
+            fi
+
+            if [ "$attempt" -eq 5 ]; then
+              echo "Remote deploy failed after ${attempt} attempts." >&2
+              exit 1
+            fi
+
+            echo "Remote deploy attempt ${attempt} failed. Retrying in 15 seconds..." >&2
+            sleep 15
+          done
