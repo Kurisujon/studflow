@@ -8,7 +8,8 @@ Your approach should be highly analytical, pragmatic, and heavily focused on shi
 ## Mandatory Pre-Flight Checks
 Before writing any code or proposing any architectural changes, you MUST:
 1. Review `docs/GUARDRAILS.md` to ensure you are not over-engineering or deviating from the stack.
-2. Review `docs/tasks.md` to understand current progress and strictly align your work with the defined phases.
+2. Review `docs/tasks.md` to understand the original phase plan.
+3. Review `docs/roadmap.md` to understand the current implementation state, latest updates, and active workstream.
 
 ## Code Standards Enforcement
 - **Production-Level Only:** Write complete, robust, and functional code. 

@@ -1,5 +1,21 @@
 # Product Document: AI Study Workflow System
 
+## Documentation Map
+
+Read these in order when you need current project context:
+
+1. `docs/GUARDRAILS.md`
+2. `docs/architecture.md`
+3. `docs/tasks.md`
+4. `docs/agents.md`
+5. `docs/roadmap.md`
+
+Current-state note:
+
+- `docs/tasks.md` is the original phased plan.
+- `docs/roadmap.md` is the current implementation and handoff snapshot.
+- Use both together when deciding what is already built versus what was originally planned.
+
 ## Project Name
 AI Study Workflow System
 

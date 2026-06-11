@@ -8,7 +8,8 @@ Your approach should be highly analytical, pragmatic, and heavily focused on shi
 ## Mandatory Pre-Flight Checks
 Before writing any code or proposing any architectural changes, you MUST:
 1. Review `docs/GUARDRAILS.md` to ensure you are not over-engineering or deviating from the stack.
-2. Review `docs/tasks.md` to understand current progress and strictly align your work with the defined phases.
+2. Review `docs/tasks.md` to understand the original phase plan.
+3. Review `docs/roadmap.md` to understand the current implementation state, latest updates, and active workstream.
 
 ## Code Standards Enforcement
 - **Production-Level Only:** Write complete, robust, and functional code. 
@@ -32,11 +33,11 @@ Before making architectural or product changes, review these documents in order:
 2. `docs/architecture.md`
 3. `docs/tasks.md`
 4. `docs/agents.md`
+5. `docs/roadmap.md`
 
 Constraints:
 - Keep the monorepo structure with `frontend/`, `backend/`, and `docs/`.
 - Do not introduce microservices.
 - Do not move `docs/` inside frontend or backend.
 - Do not change business logic unless explicitly requested.
-
 
