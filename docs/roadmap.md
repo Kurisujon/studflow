@@ -124,12 +124,18 @@ Not yet reflected accurately in `docs/tasks.md`:
 
 ## Latest Completed Update
 
-Most recent implemented change:
+Most recent implemented changes:
 
 - Homepage upload card added to the hero section in `frontend/app/page.tsx`.
 - New alias route added at `frontend/app/dashboard/upload/page.tsx`.
+- Supported file type badges added below the homepage hero section in `frontend/app/page.tsx`.
+- Feature grid section added to the homepage in `frontend/app/page.tsx`.
+- `How Studflow works` section added to the homepage in `frontend/app/page.tsx`.
+- Static study workspace preview section added to the homepage in `frontend/app/page.tsx`.
+- FAQ section added to the homepage in `frontend/app/page.tsx`.
+- Final CTA section added to the homepage in `frontend/app/page.tsx`.
 
-Behavior of that change:
+Behavior of those changes:
 
 - The homepage now shows a large upload card with:
   - upload icon
@@ -139,6 +145,38 @@ Behavior of that change:
 - Clicking the card routes to `/dashboard/upload`.
 - `/dashboard/upload` redirects to `/upload`.
 - Because `/dashboard/*` is protected, unauthenticated users should be sent through the existing Clerk auth flow before reaching upload.
+- A supported file types row now appears below the hero with:
+  - active badges for `PDF` and `DOCX`
+  - disabled `PPT soon` and `TXT soon` badges
+  - helper text: `Supports PDF and DOCX. More formats coming soon.`
+- A feature grid section now appears on the homepage with six cards:
+  - `Concise Summary`
+  - `Flashcards`
+  - `Quiz`
+  - `Smart Notes`
+  - `Ask AI`
+  - `Related Videos`
+- A `How Studflow works` section now appears on the homepage with three steps:
+  - `Upload your file`
+  - `Let AI process it`
+  - `Review actively`
+- A static study workspace preview section now appears on the homepage showing:
+  - summary content
+  - a highlighted phrase
+  - a note marker
+  - an AI bubble
+  - a related video card
+  - flashcard and quiz indicators
+- A FAQ section now appears on the homepage with five product-accurate cards covering:
+  - supported file types
+  - study expectations
+  - AI questions
+  - embedded related videos
+  - saved notes, highlights, and underlines
+- A final CTA section now appears at the bottom of the homepage with:
+  - `Start Studying` linking to `/dashboard/upload`
+  - `Go to Dashboard` linking to `/dashboard`
+  - the existing auth behavior preserved through protected routes
 - No backend upload logic was changed.
 
 Reason for the alias:
@@ -152,12 +190,12 @@ Reason for the alias:
 Requested landing page items:
 
 - [x] 1. Homepage upload card
-- [ ] 2. Supported file type badges
-- [ ] 3. Feature grid
-- [ ] 4. How it works
-- [ ] 5. Study workspace preview
-- [ ] 6. FAQ
-- [ ] 7. Final CTA
+- [x] 2. Supported file type badges
+- [x] 3. Feature grid
+- [x] 4. How it works
+- [x] 5. Study workspace preview
+- [x] 6. FAQ
+- [x] 7. Final CTA
 
 Current guidance for this workstream:
 
@@ -200,10 +238,10 @@ Assume these are intentional in-progress product changes unless the user says ot
 
 If continuing the landing page work:
 
-1. Implement item 2: supported file type badges.
-2. Then implement item 3: feature grid.
-3. Keep each section incremental and independently reviewable.
-4. Avoid coupling homepage marketing work to backend or study-workspace refactors.
+1. Treat the homepage landing-page scope as complete unless the user asks for refinement.
+2. Keep upload-entry routing aligned with `/dashboard/upload` and the existing auth flow.
+3. Avoid coupling homepage marketing work to backend or study-workspace refactors.
+4. If new sections are requested, update this roadmap after each meaningful change.
 
 If continuing core product work instead:
 
@@ -218,6 +256,11 @@ Validation completed for the latest homepage change:
 - route structure reviewed
 - auth protection path reviewed
 - backend untouched for the upload-card change
+- feature grid content and icon mapping reviewed
+- how-it-works copy and step order reviewed
+- workspace preview remains static and does not connect to real study data
+- FAQ answers reviewed against the implemented AI, notes, annotations, and related-video flows
+- final CTA links reviewed against the protected `/dashboard` and `/dashboard/upload` routes
 
 Validation not fully completed:
 

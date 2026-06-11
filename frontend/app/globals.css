@@ -257,6 +257,12 @@ select {
   background-color: var(--distill-border);
 }
 
+.homepage-feature-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 42px color-mix(in srgb, var(--theme-shadow) 90%, transparent);
+  border-color: color-mix(in srgb, var(--theme-border) 85%, var(--border));
+}
+
 @media (prefers-reduced-motion: no-preference) {
   *,
   *::before,
