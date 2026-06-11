@@ -1,18 +1,134 @@
 import Link from "next/link";
-import {
-  CircleHelp,
-  FileText,
-  Layers,
-  PlayCircle,
-  Sparkles,
-  StickyNote,
-} from "lucide-react";
 
 const HERO_FEATURES = [
   { icon: "◈", label: "1 Summary" },
   { icon: "⬡", label: "15 Flashcards" },
   { icon: "◇", label: "10-Question Quiz" },
 ] as const;
+
+type IconProps = {
+  size?: number;
+  strokeWidth?: number;
+};
+
+function FileTextIcon({ size = 18, strokeWidth = 1.8 }: IconProps) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      width={size}
+      height={size}
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+      <path d="M14 3v5h5" />
+      <path d="M9 13h6" />
+      <path d="M9 17h6" />
+    </svg>
+  );
+}
+
+function LayersIcon({ size = 18, strokeWidth = 1.8 }: IconProps) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      width={size}
+      height={size}
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="m12 3 8 4.5-8 4.5-8-4.5L12 3Z" />
+      <path d="m4 12 8 4.5 8-4.5" />
+      <path d="m4 16.5 8 4.5 8-4.5" />
+    </svg>
+  );
+}
+
+function HelpCircleIcon({ size = 18, strokeWidth = 1.8 }: IconProps) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      width={size}
+      height={size}
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9.75 9.25a2.25 2.25 0 1 1 3.93 1.49c-.8.78-1.43 1.3-1.43 2.51" />
+      <path d="M12 17h.01" />
+    </svg>
+  );
+}
+
+function StickyNoteIcon({ size = 18, strokeWidth = 1.8 }: IconProps) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      width={size}
+      height={size}
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M5 4h14a2 2 0 0 1 2 2v9l-5 5H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" />
+      <path d="M16 20v-4a1 1 0 0 1 1-1h4" />
+    </svg>
+  );
+}
+
+function SparklesIcon({ size = 18, strokeWidth = 1.8 }: IconProps) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      width={size}
+      height={size}
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="m12 3 1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8L12 3Z" />
+      <path d="M5 17l.9 2.1L8 20l-2.1.9L5 23l-.9-2.1L2 20l2.1-.9L5 17Z" />
+      <path d="M19 13l1.1 2.4L22.5 16l-2.4 1.1L19 19.5l-1.1-2.4L15.5 16l2.4-1.1L19 13Z" />
+    </svg>
+  );
+}
+
+function PlayCircleIcon({ size = 18, strokeWidth = 1.8 }: IconProps) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      width={size}
+      height={size}
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="12" cy="12" r="9" />
+      <path d="m10 9 5 3-5 3V9Z" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
 
 const SUPPORTED_FORMATS = ["PDF", "DOCX"] as const;
 const UPCOMING_FORMATS = ["PPT soon", "TXT soon"] as const;
@@ -21,36 +137,36 @@ const FEATURE_CARDS = [
     title: "Concise Summary",
     description:
       "Get the main ideas without reading the whole document line by line.",
-    icon: FileText,
+    icon: FileTextIcon,
   },
   {
     title: "Flashcards",
     description: "Review key concepts with quick active-recall cards.",
-    icon: Layers,
+    icon: LayersIcon,
   },
   {
     title: "Quiz",
     description:
       "Test understanding with generated questions and instant scoring.",
-    icon: CircleHelp,
+    icon: HelpCircleIcon,
   },
   {
     title: "Smart Notes",
     description:
       "Highlight phrases, add notes, and return to important parts later.",
-    icon: StickyNote,
+    icon: StickyNoteIcon,
   },
   {
     title: "Ask AI",
     description:
       "Ask about confusing terms, selected text, or saved notes.",
-    icon: Sparkles,
+    icon: SparklesIcon,
   },
   {
     title: "Related Videos",
     description:
       "Watch related learning videos without leaving the study page.",
-    icon: PlayCircle,
+    icon: PlayCircleIcon,
   },
 ] as const;
 const HOW_IT_WORKS_STEPS = [
@@ -191,7 +307,7 @@ function WorkspacePreviewMock() {
                 fontWeight: 500,
               }}
             >
-              <FileText size={14} strokeWidth={1.8} />
+              <FileTextIcon size={14} strokeWidth={1.8} />
               Key ideas
             </div>
           </div>
@@ -299,7 +415,7 @@ function WorkspacePreviewMock() {
                   fontWeight: 500,
                 }}
               >
-                <Layers size={14} strokeWidth={1.8} />
+                <LayersIcon size={14} strokeWidth={1.8} />
                 15 flashcards
               </div>
               <div
@@ -316,7 +432,7 @@ function WorkspacePreviewMock() {
                   fontWeight: 500,
                 }}
               >
-                <CircleHelp size={14} strokeWidth={1.8} />
+                <HelpCircleIcon size={14} strokeWidth={1.8} />
                 10-question quiz
               </div>
             </div>
@@ -356,7 +472,7 @@ function WorkspacePreviewMock() {
                   fontWeight: 600,
                 }}
               >
-                <Sparkles size={15} strokeWidth={1.8} />
+                <SparklesIcon size={15} strokeWidth={1.8} />
                 Ask AI
               </div>
               <span
@@ -431,7 +547,7 @@ function WorkspacePreviewMock() {
                   flexShrink: 0,
                 }}
               >
-                <StickyNote size={15} strokeWidth={1.8} />
+                <StickyNoteIcon size={15} strokeWidth={1.8} />
               </div>
               <div>
                 <p
@@ -487,7 +603,7 @@ function WorkspacePreviewMock() {
                     flexShrink: 0,
                   }}
                 >
-                  <PlayCircle size={15} strokeWidth={1.8} />
+                  <PlayCircleIcon size={15} strokeWidth={1.8} />
                 </div>
                 <div>
                   <p
@@ -1122,7 +1238,7 @@ export default function HomePage() {
                     textTransform: "uppercase",
                   }}
                 >
-                  <CircleHelp size={15} strokeWidth={1.8} />
+                  <HelpCircleIcon size={15} strokeWidth={1.8} />
                   FAQ
                 </div>
 
