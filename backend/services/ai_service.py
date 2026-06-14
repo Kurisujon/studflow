@@ -61,6 +61,20 @@ class SelectionExplanation(BaseModel):
     suggested_flashcard: SuggestedFlashcard
 
 
+class SupportingChunk(BaseModel):
+    chunk_index: int = Field(ge=0)
+    excerpt: str
+    relevance_reason: str
+
+
+class DocumentQuestionAnswer(BaseModel):
+    answer: str
+    key_points: list[str]
+    related_terms: list[str]
+    suggested_flashcard: SuggestedFlashcard
+    supporting_chunks: list[SupportingChunk]
+
+
 class YouTubeSearchQuery(BaseModel):
     main_topic: str
     search_query: str
@@ -79,6 +93,15 @@ If the document is long, ensure your response thoroughly covers the beginning, m
 EXPLAIN_SELECTION_PROMPT = """
 You are a patient academic tutor helping a student understand a highlighted word, phrase, or passage from study material.
 Explain it clearly, simply, and accurately. Avoid jargon when possible. If the student asks a follow-up question, answer it directly.
+Return only JSON that matches the required schema.
+""".strip()
+
+
+DOCUMENT_QA_PROMPT = """
+You are an academic tutor answering a student's question about an uploaded study document.
+You must answer using only the provided document chunks.
+Do not invent facts not supported by the chunks.
+Keep the answer clear, direct, and helpful for a student.
 Return only JSON that matches the required schema.
 """.strip()
 
@@ -291,6 +314,31 @@ def explain_selection(
         response_schema=SelectionExplanation,
     )
     return SelectionExplanation.model_validate_json(response.text)
+
+
+def answer_document_question(
+    *,
+    chunks: list[str],
+    user_question: str,
+) -> DocumentQuestionAnswer:
+    if not chunks:
+        raise AIServiceError("Cannot answer a document question without document chunks.")
+    if not user_question.strip():
+        raise AIServiceError("A document question is required.")
+
+    prompt = (
+        f"{DOCUMENT_QA_PROMPT}\n\n"
+        "Use the chunk numbers exactly as provided when choosing supporting_chunks.\n"
+        "Keep supporting_chunks limited to the most relevant 2 to 4 chunks.\n"
+        "The excerpt for each supporting chunk must be a short quote or paraphrase from the chunk.\n\n"
+        f"Student question:\n{user_question.strip()}\n\n"
+        f"{_join_chunks(chunks)}"
+    )
+    response = _generate_structured(
+        prompt=prompt,
+        response_schema=DocumentQuestionAnswer,
+    )
+    return DocumentQuestionAnswer.model_validate_json(response.text)
 
 
 def extract_youtube_search_query(document_text_or_summary: str) -> YouTubeSearchQuery:

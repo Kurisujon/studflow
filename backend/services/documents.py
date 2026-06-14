@@ -4,7 +4,7 @@ import json
 import uuid
 from datetime import datetime
 
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from models.tables import (
     Document,
@@ -99,6 +99,31 @@ def save_flashcards(
     session.add_all(records)
     session.commit()
     return records
+
+
+def create_flashcard(
+    *,
+    session: Session,
+    document_id: uuid.UUID,
+    front: str,
+    back: str,
+) -> Flashcard:
+    last_flashcard = session.exec(
+        select(Flashcard)
+        .where(Flashcard.document_id == document_id)
+        .order_by(Flashcard.order_index.desc())
+    ).first()
+
+    flashcard = Flashcard(
+        document_id=document_id,
+        front=front,
+        back=back,
+        order_index=(last_flashcard.order_index + 1) if last_flashcard else 0,
+    )
+    session.add(flashcard)
+    session.commit()
+    session.refresh(flashcard)
+    return flashcard
 
 
 def save_document_chunks(

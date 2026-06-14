@@ -82,9 +82,9 @@ Goal: make Studflow feel calmer, more editorial, and more focused for long-form 
 
 These are intentionally sequenced after the UI refinement workstream:
 
-- [ ] Save AI answer as flashcard
-- [ ] Quiz attempt history with weak-topic review
-- [ ] Document-level Q&A grounded in extracted document chunks
+- [x] Save AI answer as flashcard
+- [x] Quiz attempt history with weak-topic review
+- [x] Document-level Q&A grounded in extracted document chunks
 
 ## Explicit Non-Goals For This Workstream
 

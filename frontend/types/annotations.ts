@@ -42,6 +42,12 @@ export type AIExplanation = {
   beginnerExplanation: string;
   example: string;
   relatedTerms: string[];
+  keyPoints?: string[];
+  sourceChunks?: Array<{
+    chunkIndex: number;
+    excerpt: string;
+    relevanceReason: string;
+  }>;
   suggestedFlashcard: {
     front: string;
     back: string;

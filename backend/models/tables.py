@@ -80,6 +80,7 @@ class Document(SQLModel, table=True):
     chunks: list["DocumentChunk"] = Relationship(back_populates="document")
     flashcards: list["Flashcard"] = Relationship(back_populates="document")
     quiz: Optional["Quiz"] = Relationship(back_populates="document")
+    quiz_attempts: list["QuizAttempt"] = Relationship(back_populates="document")
     related_videos: list["RelatedVideo"] = Relationship(back_populates="document")
     annotations: list["StudyAnnotation"] = Relationship(back_populates="document")
     ai_history_items: list["AIHistory"] = Relationship(back_populates="document")
@@ -208,6 +209,31 @@ class QuizQuestion(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
 
     quiz: Optional[Quiz] = Relationship(back_populates="questions")
+
+
+# ---------------------------------------------------------------------------
+# QuizAttempt
+# ---------------------------------------------------------------------------
+
+
+class QuizAttempt(SQLModel, table=True):
+    __tablename__ = "quiz_attempts"
+
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        primary_key=True,
+        index=True,
+        nullable=False,
+    )
+    document_id: uuid.UUID = Field(
+        foreign_key="documents.id", nullable=False, index=True
+    )
+    score: int = Field(nullable=False)
+    total_questions: int = Field(nullable=False)
+    incorrect_question_ids: str = Field(nullable=False, default="[]")
+    created_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
+
+    document: Optional[Document] = Relationship(back_populates="quiz_attempts")
 
 
 # ---------------------------------------------------------------------------

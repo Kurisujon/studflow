@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useEffectEvent, useRef, useState, type MouseEvent } from "react";
+import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -8,7 +9,8 @@ import {
   deleteAIHistory,
   getAIHistory,
 } from "@/lib/api/ai-history";
-import { askAIAboutSelection } from "@/lib/api/annotations";
+import { askAIAboutDocument, askAIAboutSelection } from "@/lib/api/annotations";
+import { createFlashcard } from "@/lib/api/flashcards";
 import type {
   AIExplanation,
   AIHistoryItem,
@@ -111,12 +113,16 @@ export function AIStudyAssistantPanel({
   const [historyActionError, setHistoryActionError] = useState<string | null>(null);
   const [deletingHistoryId, setDeletingHistoryId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [flashcardSaveError, setFlashcardSaveError] = useState<string | null>(null);
+  const [flashcardSaved, setFlashcardSaved] = useState(false);
+  const [savingFlashcard, setSavingFlashcard] = useState(false);
   const [response, setResponse] = useState<AIExplanation | null>(null);
   const [history, setHistory] = useState<AIHistoryItem[]>([]);
   const [loadedHistoryItem, setLoadedHistoryItem] = useState<AIHistoryItem | null>(null);
   const [activeMode, setActiveMode] = useState<AIToolMode>(mode);
   const questionRef = useRef<HTMLTextAreaElement | null>(null);
   const { getToken } = useAuth();
+  const router = useRouter();
 
   const resetPanelForContext = useEffectEvent(() => {
     setQuestion(initialQuestion ?? "");
@@ -124,6 +130,8 @@ export function AIStudyAssistantPanel({
     setResponse(null);
     setError(null);
     setHistoryActionError(null);
+    setFlashcardSaveError(null);
+    setFlashcardSaved(false);
     setActiveMode(mode);
   });
 
@@ -182,10 +190,14 @@ export function AIStudyAssistantPanel({
       }
     : context;
   const hasContext = Boolean(
-    displayedContext.selectedText.trim() || displayedContext.noteContent?.trim(),
+    displayedContext.source === "general" ||
+      displayedContext.selectedText.trim() ||
+      displayedContext.noteContent?.trim(),
   );
   const placeholder =
-    displayedContext.source === "note"
+    displayedContext.source === "general"
+      ? "Ask something about the whole document..."
+      : displayedContext.source === "note"
       ? "Ask something about this note..."
       : "Ask something about this text...";
   const searchValue = historySearch.trim().toLowerCase();
@@ -214,6 +226,8 @@ export function AIStudyAssistantPanel({
     setResponse(null);
     setError(null);
     setHistoryActionError(null);
+    setFlashcardSaveError(null);
+    setFlashcardSaved(false);
     setActiveMode(mode);
     setQuestion(initialQuestion ?? "");
     questionRef.current?.focus();
@@ -242,21 +256,33 @@ export function AIStudyAssistantPanel({
 
     try {
       const token = await getToken({ skipCache: true });
-      const payload = await askAIAboutSelection(
-        documentId,
-        requestContext.selectedText,
-        resolvedQuestion,
-        token,
-        {
-          noteContent: requestContext.noteContent,
-          source: requestContext.source,
-          mode: requestedMode,
-        },
-      );
+      const payload =
+        requestContext.source === "general"
+          ? await askAIAboutDocument(
+              documentId,
+              resolvedQuestion,
+              token,
+              {
+                mode: requestedMode,
+              },
+            )
+          : await askAIAboutSelection(
+              documentId,
+              requestContext.selectedText,
+              resolvedQuestion,
+              token,
+              {
+                noteContent: requestContext.noteContent,
+                source: requestContext.source,
+                mode: requestedMode,
+              },
+            );
 
       setQuestion(resolvedQuestion);
       setLoadedHistoryItem(null);
       setResponse(payload);
+      setFlashcardSaveError(null);
+      setFlashcardSaved(false);
 
       const shouldPersistQuestion =
         resolvedQuestion.trim() !== defaultQuestionForMode(requestedMode).trim();
@@ -299,7 +325,39 @@ export function AIStudyAssistantPanel({
     setActiveMode(item.mode);
     setError(null);
     setHistoryActionError(null);
+    setFlashcardSaveError(null);
+    setFlashcardSaved(false);
     setResponse(toSavedSessionResponse(item));
+  }
+
+  async function handleSaveSuggestedFlashcard() {
+    if (!response?.suggestedFlashcard || savingFlashcard) {
+      return;
+    }
+
+    setSavingFlashcard(true);
+    setFlashcardSaveError(null);
+
+    try {
+      const token = await getToken({ skipCache: true });
+      await createFlashcard(
+        documentId,
+        {
+          front: response.suggestedFlashcard.front,
+          back: response.suggestedFlashcard.back,
+        },
+        token,
+      );
+      setFlashcardSaved(true);
+      router.refresh();
+    } catch (saveError) {
+      console.error(saveError);
+      setFlashcardSaveError(
+        saveError instanceof Error ? saveError.message : "Flashcard could not be saved.",
+      );
+    } finally {
+      setSavingFlashcard(false);
+    }
   }
 
   async function handleDeleteHistory(
@@ -383,6 +441,10 @@ export function AIStudyAssistantPanel({
               <strong>Your note:</strong> {displayedContext.noteContent}
             </p>
           </div>
+        ) : displayedContext.source === "general" ? (
+          <p className="study-body-copy" style={{ color: "var(--muted-foreground)" }}>
+            Ask about the full uploaded document. Studflow will answer using the extracted document chunks.
+          </p>
         ) : (
           <p className="study-body-copy" style={{ color: "var(--muted-foreground)" }}>
             {displayedContext.selectedText
@@ -455,6 +517,9 @@ export function AIStudyAssistantPanel({
       {error ? (
         <p style={{ color: "#b42318", fontSize: "0.92rem" }}>{error}</p>
       ) : null}
+      {flashcardSaveError ? (
+        <p style={{ color: "#b42318", fontSize: "0.92rem" }}>{flashcardSaveError}</p>
+      ) : null}
 
       {response ? (
         <div style={{ display: "grid", gap: "1rem" }}>
@@ -518,6 +583,104 @@ export function AIStudyAssistantPanel({
               </ul>
             </div>
           ) : null}
+
+          {activeMode === "ask-ai" && response.keyPoints && response.keyPoints.length > 0 ? (
+            <div
+              className="study-support-surface"
+              style={{
+                padding: "1rem",
+              }}
+            >
+              <p className="study-meta-label" style={{ marginBottom: "0.45rem" }}>
+                Key Points
+              </p>
+              <ul style={{ display: "grid", gap: "0.55rem", paddingLeft: "1rem" }}>
+                {response.keyPoints.map((point, index) => (
+                  <li key={`key-point-${index}`} className="study-body-copy">
+                    {point}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {activeMode === "ask-ai" && response.sourceChunks && response.sourceChunks.length > 0 ? (
+            <div
+              className="study-support-surface"
+              style={{
+                padding: "1rem",
+              }}
+            >
+              <p className="study-meta-label" style={{ marginBottom: "0.45rem" }}>
+                Grounded In These Chunks
+              </p>
+              <div style={{ display: "grid", gap: "0.75rem" }}>
+                {response.sourceChunks.map((chunk) => (
+                  <div
+                    key={`chunk-${chunk.chunkIndex}-${chunk.excerpt}`}
+                    className="study-empty-state"
+                  >
+                    <p className="study-meta-label" style={{ marginBottom: "0.35rem" }}>
+                      Chunk {chunk.chunkIndex + 1}
+                    </p>
+                    <p className="study-body-copy" style={{ color: "var(--foreground)", marginBottom: "0.4rem" }}>
+                      {chunk.excerpt}
+                    </p>
+                    <p className="study-body-copy" style={{ fontSize: "0.88rem" }}>
+                      {chunk.relevanceReason}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          <div
+            className="study-support-surface"
+            style={{
+              padding: "1rem",
+            }}
+          >
+            <p className="study-meta-label" style={{ marginBottom: "0.45rem" }}>
+              Suggested Flashcard
+            </p>
+            <div style={{ display: "grid", gap: "0.7rem" }}>
+              <div>
+                <p style={{ color: "var(--theme-primary)", fontSize: "0.82rem", fontWeight: 600, marginBottom: "0.25rem" }}>
+                  Front
+                </p>
+                <p className="study-body-copy" style={{ color: "var(--foreground)" }}>
+                  {response.suggestedFlashcard.front}
+                </p>
+              </div>
+              <div>
+                <p style={{ color: "var(--theme-primary)", fontSize: "0.82rem", fontWeight: 600, marginBottom: "0.25rem" }}>
+                  Back
+                </p>
+                <p className="study-body-copy" style={{ color: "var(--foreground)" }}>
+                  {response.suggestedFlashcard.back}
+                </p>
+              </div>
+              <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "center" }}>
+                <Button
+                  onClick={() => void handleSaveSuggestedFlashcard()}
+                  disabled={savingFlashcard || flashcardSaved}
+                  className="study-utility-pill"
+                >
+                  {savingFlashcard
+                    ? "Saving..."
+                    : flashcardSaved
+                      ? "Saved to Flashcards"
+                      : "Save as Flashcard"}
+                </Button>
+                {flashcardSaved ? (
+                  <p className="study-body-copy" style={{ fontSize: "0.88rem" }}>
+                    Open the Flashcards tab to review it.
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          </div>
         </div>
       ) : null}
 

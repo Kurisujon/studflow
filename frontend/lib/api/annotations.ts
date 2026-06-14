@@ -63,6 +63,45 @@ export async function askAIAboutSelection(
   return payload;
 }
 
+export async function askAIAboutDocument(
+  documentId: string,
+  question: string,
+  authToken: string | null,
+  options?: {
+    mode?: AIToolMode;
+  },
+): Promise<AIExplanation> {
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+  };
+
+  if (authToken) {
+    headers["Authorization"] = `Bearer ${authToken}`;
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/documents/${documentId}/ask-ai`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      question,
+      source: "general",
+      mode: options?.mode ?? "ask-ai",
+    }),
+  });
+
+  if (!response.ok) {
+    throw await buildAPIError(response, "Document AI question failed");
+  }
+
+  const payload = (await response.json()) as AIExplanation;
+
+  if (!isAIExplanation(payload)) {
+    throw new Error("Document AI response was missing explanation content.");
+  }
+
+  return payload;
+}
+
 export async function getAnnotations(documentId: string, authToken: string | null): Promise<Annotation[]> {
   const headers: HeadersInit = { "Content-Type": "application/json" };
   if (authToken) headers["Authorization"] = `Bearer ${authToken}`;

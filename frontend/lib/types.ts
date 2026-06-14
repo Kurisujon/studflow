@@ -26,6 +26,15 @@ export type StudyQuizQuestion = {
   order_index: number;
 };
 
+export type QuizAttemptSummary = {
+  id: string;
+  documentId: string;
+  score: number;
+  totalQuestions: number;
+  incorrectQuestionIds: string[];
+  createdAt: string;
+};
+
 export type StudyDocument = {
   id: string;
   filename: string;

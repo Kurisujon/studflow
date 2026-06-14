@@ -127,7 +127,11 @@ export function StudySidePanel({
               <motion.div key="ai" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} transition={{ duration: 0.18, ease: "easeOut" }}>
                 <AIStudyAssistantPanel
                   documentId={documentId}
-                  context={aiContext.source ? aiContext : { source: "selection", selectedText }}
+                  context={
+                    aiContext.selectedText || aiContext.noteContent
+                      ? aiContext
+                      : { source: "general", selectedText: "" }
+                  }
                   initialQuestion={assistantInitialQuestion}
                   mode={aiMode}
                 />

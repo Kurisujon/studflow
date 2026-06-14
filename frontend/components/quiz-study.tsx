@@ -6,30 +6,94 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
-import type { StudyQuizQuestion } from "@/lib/types";
+import { useAuth } from "@clerk/nextjs";
+import { createQuizAttempt, getQuizAttempts } from "@/lib/api/quiz-attempts";
+import type { QuizAttemptSummary, StudyQuizQuestion } from "@/lib/types";
 
 export function QuizStudy({
+  documentId,
   questions,
 }: {
+  documentId: string;
   questions: StudyQuizQuestion[];
 }) {
   const PASSING_SCORE_RATIO = 0.7;
   const router = useRouter();
+  const { getToken, isLoaded, isSignedIn } = useAuth();
   const [activeIndex, setActiveIndex] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState<Record<number, number>>({});
   const [showScore, setShowScore] = useState(false);
+  const [quizMode, setQuizMode] = useState<"full" | "incorrect-only">("full");
+  const [attempts, setAttempts] = useState<QuizAttemptSummary[]>([]);
+  const [attemptsLoading, setAttemptsLoading] = useState(true);
+  const [attemptError, setAttemptError] = useState<string | null>(null);
+  const [sessionQuestions, setSessionQuestions] = useState(questions);
   const hasCelebratedRef = useRef(false);
-  const hasQuestions = questions.length > 0;
-  const question = hasQuestions ? questions[activeIndex] : null;
+  const persistedAttemptRef = useRef(false);
+  const hasQuestions = sessionQuestions.length > 0;
+  const question = hasQuestions ? sessionQuestions[activeIndex] : null;
   const selectedIndex = selectedAnswers[activeIndex];
   const answered = selectedIndex !== undefined;
   const isCorrect =
     question !== null && answered && selectedIndex === question.correct_answer_index;
-  const score = questions.reduce((total, currentQuestion, index) => {
+  const score = sessionQuestions.reduce((total, currentQuestion, index) => {
     return total + Number(selectedAnswers[index] === currentQuestion.correct_answer_index);
   }, 0);
-  const passingScore = Math.ceil(questions.length * PASSING_SCORE_RATIO);
+  const passingScore = Math.ceil(sessionQuestions.length * PASSING_SCORE_RATIO);
   const passed = score >= passingScore;
+  const incorrectQuestions = sessionQuestions.filter(
+    (currentQuestion, index) =>
+      selectedAnswers[index] !== undefined &&
+      selectedAnswers[index] !== currentQuestion.correct_answer_index,
+  );
+  const currentIncorrectQuestionIds = incorrectQuestions.map((currentQuestion) => currentQuestion.id);
+
+  useEffect(() => {
+    setSessionQuestions(questions);
+    setActiveIndex(0);
+    setSelectedAnswers({});
+    setShowScore(false);
+    setQuizMode("full");
+    persistedAttemptRef.current = false;
+  }, [questions]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadAttempts() {
+      if (!isLoaded || !isSignedIn) {
+        if (mounted) {
+          setAttemptsLoading(false);
+        }
+        return;
+      }
+
+      setAttemptsLoading(true);
+      try {
+        const token = await getToken({ skipCache: true });
+        const history = await getQuizAttempts(documentId, token);
+        if (mounted) {
+          setAttempts(history);
+          setAttemptError(null);
+        }
+      } catch (error) {
+        console.error(error);
+        if (mounted) {
+          setAttemptError("Quiz history could not be loaded.");
+        }
+      } finally {
+        if (mounted) {
+          setAttemptsLoading(false);
+        }
+      }
+    }
+
+    void loadAttempts();
+
+    return () => {
+      mounted = false;
+    };
+  }, [documentId, getToken, isLoaded, isSignedIn]);
 
   useEffect(() => {
     if (!showScore || !passed || hasCelebratedRef.current) {
@@ -90,7 +154,7 @@ export function QuizStudy({
       if (event.key === "Enter" && answered) {
         event.preventDefault();
 
-        if (activeIndex === questions.length - 1) {
+        if (activeIndex === sessionQuestions.length - 1) {
           setShowScore(true);
           return;
         }
@@ -103,7 +167,46 @@ export function QuizStudy({
     return () => {
       window.removeEventListener("keydown", handleQuizShortcuts);
     };
-  }, [activeIndex, answered, question, questions.length, showScore]);
+  }, [activeIndex, answered, question, sessionQuestions.length, showScore]);
+
+  useEffect(() => {
+    if (!showScore || persistedAttemptRef.current || !isLoaded || !isSignedIn) {
+      return;
+    }
+
+    persistedAttemptRef.current = true;
+
+    async function saveAttempt() {
+      try {
+        const token = await getToken({ skipCache: true });
+        const savedAttempt = await createQuizAttempt(
+          documentId,
+          {
+            score,
+            totalQuestions: sessionQuestions.length,
+            incorrectQuestionIds: currentIncorrectQuestionIds,
+          },
+          token,
+        );
+        setAttempts((current) => [savedAttempt, ...current]);
+        setAttemptError(null);
+      } catch (error) {
+        console.error(error);
+        setAttemptError("Quiz attempt could not be saved.");
+      }
+    }
+
+    void saveAttempt();
+  }, [
+    currentIncorrectQuestionIds,
+    documentId,
+    getToken,
+    isLoaded,
+    isSignedIn,
+    score,
+    sessionQuestions.length,
+    showScore,
+  ]);
 
   if (!hasQuestions || question === null) {
     return (
@@ -130,7 +233,7 @@ export function QuizStudy({
   }
 
   function handleNext() {
-    if (activeIndex === questions.length - 1) {
+    if (activeIndex === sessionQuestions.length - 1) {
       setShowScore(true);
       return;
     }
@@ -142,7 +245,42 @@ export function QuizStudy({
     setActiveIndex(0);
     setSelectedAnswers({});
     setShowScore(false);
+    setSessionQuestions(questions);
+    setQuizMode("full");
     hasCelebratedRef.current = false;
+    persistedAttemptRef.current = false;
+  }
+
+  function handleRetryIncorrect() {
+    if (currentIncorrectQuestionIds.length === 0) {
+      return;
+    }
+
+    setSessionQuestions(
+      questions.filter((currentQuestion) => currentIncorrectQuestionIds.includes(currentQuestion.id)),
+    );
+    setQuizMode("incorrect-only");
+    setActiveIndex(0);
+    setSelectedAnswers({});
+    setShowScore(false);
+    hasCelebratedRef.current = false;
+    persistedAttemptRef.current = false;
+  }
+
+  function handleRetryFromAttempt(attempt: QuizAttemptSummary) {
+    if (attempt.incorrectQuestionIds.length === 0) {
+      return;
+    }
+
+    setSessionQuestions(
+      questions.filter((currentQuestion) => attempt.incorrectQuestionIds.includes(currentQuestion.id)),
+    );
+    setQuizMode("incorrect-only");
+    setActiveIndex(0);
+    setSelectedAnswers({});
+    setShowScore(false);
+    hasCelebratedRef.current = false;
+    persistedAttemptRef.current = false;
   }
 
   if (showScore) {
@@ -162,7 +300,7 @@ export function QuizStudy({
         }}
       >
         <p className="study-meta-label" style={{ marginBottom: "0.75rem", position: "relative" }}>
-          {passed ? "Quiz Complete" : "Try Again"}
+          {quizMode === "incorrect-only" ? "Weak Topic Review" : passed ? "Quiz Complete" : "Try Again"}
         </p>
         {passed ? (
           <div
@@ -184,17 +322,45 @@ export function QuizStudy({
           </div>
         ) : null}
         <h2 style={{ marginBottom: "0.75rem", position: "relative", maxWidth: "18ch" }}>
-          Final score: {score} / {questions.length}
+          Final score: {score} / {sessionQuestions.length}
         </h2>
         <p className="study-body-copy" style={{ marginBottom: "0.45rem", position: "relative" }}>
-          Passing score: {passingScore} / {questions.length}
+          Passing score: {passingScore} / {sessionQuestions.length}
         </p>
         <p className="study-body-copy" style={{ marginBottom: "1.5rem", position: "relative", maxWidth: "58ch" }}>
-          {passed
+          {quizMode === "incorrect-only"
+            ? "You reviewed only the missed questions from the previous attempt."
+            : passed
             ? "You passed. Review the material again or continue with another study session."
             : "You did not reach the passing score yet. Review the quiz again or return to the dashboard for more practice."}
         </p>
+        {incorrectQuestions.length > 0 ? (
+          <div className="study-support-surface" style={{ marginBottom: "1rem", padding: "1rem" }}>
+            <p className="study-meta-label" style={{ marginBottom: "0.45rem" }}>
+              Weak Topic Review
+            </p>
+            <p className="study-body-copy" style={{ marginBottom: "0.65rem" }}>
+              Missed questions in this attempt: {incorrectQuestions.length}
+            </p>
+            <ul style={{ display: "grid", gap: "0.55rem", paddingLeft: "1rem" }}>
+              {incorrectQuestions.map((incorrectQuestion) => (
+                <li key={incorrectQuestion.id} className="study-body-copy">
+                  {incorrectQuestion.question}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
         <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+          {incorrectQuestions.length > 0 ? (
+            <Button
+              variant="outline"
+              onClick={handleRetryIncorrect}
+              className="study-utility-pill"
+            >
+              Retry Incorrect Only
+            </Button>
+          ) : null}
           <Button
             onClick={handleRetake}
             className="study-utility-pill"
@@ -212,6 +378,57 @@ export function QuizStudy({
             Return to Dashboard
           </Button>
         </div>
+        <div style={{ marginTop: "1rem", display: "grid", gap: "0.7rem" }}>
+          <p className="study-meta-label">
+            Recent Attempts {attempts.length > 0 ? `(${attempts.length})` : ""}
+          </p>
+          {attemptError ? (
+            <p style={{ color: "#b42318", fontSize: "0.9rem" }}>{attemptError}</p>
+          ) : null}
+          {attemptsLoading ? (
+            <p className="study-body-copy">Loading attempt history...</p>
+          ) : attempts.length === 0 ? (
+            <div className="study-empty-state">
+              <p className="study-body-copy">No previous quiz attempts yet.</p>
+            </div>
+          ) : (
+            <div style={{ display: "grid", gap: "0.7rem" }}>
+              {attempts.slice(0, 5).map((attempt) => (
+                <div
+                  key={attempt.id}
+                  className="study-interactive-card"
+                  style={{
+                    padding: "0.9rem 1rem",
+                    borderRadius: "16px",
+                    border: "1px solid var(--theme-border)",
+                    backgroundColor: "var(--card)",
+                  }}
+                >
+                  <p className="study-body-copy" style={{ color: "var(--foreground)", fontWeight: 600 }}>
+                    {attempt.score} / {attempt.totalQuestions}
+                  </p>
+                  <p className="study-body-copy" style={{ fontSize: "0.88rem" }}>
+                    Missed {attempt.incorrectQuestionIds.length} question{attempt.incorrectQuestionIds.length === 1 ? "" : "s"}
+                  </p>
+                  <p className="study-body-copy" style={{ fontSize: "0.82rem" }}>
+                    {new Date(attempt.createdAt).toLocaleString()}
+                  </p>
+                  {attempt.incorrectQuestionIds.length > 0 ? (
+                    <div style={{ marginTop: "0.7rem" }}>
+                      <Button
+                        variant="outline"
+                        className="study-utility-pill"
+                        onClick={() => handleRetryFromAttempt(attempt)}
+                      >
+                        Retry Missed
+                      </Button>
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </motion.section>
     );
   }
@@ -219,7 +436,7 @@ export function QuizStudy({
   return (
     <section className="study-stage-shell" style={{ color: "var(--foreground)" }}>
       <p className="study-meta-label" style={{ marginBottom: "0.75rem" }}>
-        Question {activeIndex + 1} of {questions.length}
+        {quizMode === "incorrect-only" ? "Retry Incorrect Only" : "Quiz"}: Question {activeIndex + 1} of {sessionQuestions.length}
       </p>
       <p className="study-body-copy" style={{ fontSize: "0.88rem", marginBottom: "0.9rem" }}>
         Shortcuts: 1-4 choose an answer. Enter moves to the next question after you answer.
@@ -297,12 +514,12 @@ export function QuizStudy({
         disabled={!answered}
         className="study-utility-pill"
         style={{
-          minWidth: activeIndex === questions.length - 1 ? "126px" : "146px",
+          minWidth: activeIndex === sessionQuestions.length - 1 ? "126px" : "146px",
           whiteSpace: "nowrap",
           color: "var(--theme-on-primary)",
         }}
       >
-        {activeIndex === questions.length - 1 ? "Show Score" : "Next Question"}
+        {activeIndex === sessionQuestions.length - 1 ? "Show Score" : "Next Question"}
       </Button>
     </section>
   );

@@ -18,6 +18,7 @@ from models.tables import (
     DocumentStatus,
     Flashcard,
     Quiz,
+    QuizAttempt,
     QuizQuestion,
     Summary,
     StudyAnnotation,
@@ -29,7 +30,13 @@ from schemas.ai_history import (
     AIHistorySource,
     CreateAIHistoryRequest,
 )
-from services.ai_service import AIServiceError, ComprehensiveSummary, explain_selection
+from services.ai_service import (
+    AIServiceError,
+    ComprehensiveSummary,
+    answer_document_question,
+    explain_selection,
+)
+from services.documents import create_flashcard
 
 router = APIRouter()
 
@@ -72,6 +79,15 @@ class QuizQuestionResponse(BaseModel):
     order_index: int
 
 
+class QuizAttemptResponse(BaseModel):
+    id: uuid.UUID
+    documentId: str
+    score: int
+    totalQuestions: int
+    incorrectQuestionIds: list[str]
+    createdAt: datetime
+
+
 class StudyDocumentResponse(BaseModel):
     id: uuid.UUID
     filename: str
@@ -81,6 +97,33 @@ class StudyDocumentResponse(BaseModel):
     summary_data: dict | None
     flashcards: list[FlashcardResponse]
     quiz: list[QuizQuestionResponse]
+
+
+class CreateFlashcardRequest(BaseModel):
+    front: str = Field(min_length=1)
+    back: str = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def normalize_flashcard_fields(self) -> "CreateFlashcardRequest":
+        self.front = self.front.strip()
+        self.back = self.back.strip()
+        if not self.front:
+            raise ValueError("front is required.")
+        if not self.back:
+            raise ValueError("back is required.")
+        return self
+
+
+class CreateQuizAttemptRequest(BaseModel):
+    score: int = Field(ge=0)
+    totalQuestions: int = Field(gt=0)
+    incorrectQuestionIds: list[uuid.UUID] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_quiz_attempt(self) -> "CreateQuizAttemptRequest":
+        if self.score > self.totalQuestions:
+            raise ValueError("score cannot be greater than totalQuestions.")
+        return self
 
 
 class DocumentChunkResponse(BaseModel):
@@ -98,6 +141,18 @@ class ExplainSelectionRequest(BaseModel):
     mode: AIHistoryMode = "ask-ai"
 
 
+class DocumentQuestionRequest(BaseModel):
+    question: str = Field(min_length=1)
+    mode: AIHistoryMode = "ask-ai"
+
+    @model_validator(mode="after")
+    def normalize_question(self) -> "DocumentQuestionRequest":
+        self.question = self.question.strip()
+        if not self.question:
+            raise ValueError("A document question is required.")
+        return self
+
+
 class ExplainSelectionResponse(BaseModel):
     historyId: uuid.UUID | None = None
     selectedText: str
@@ -106,6 +161,8 @@ class ExplainSelectionResponse(BaseModel):
     example: str
     relatedTerms: list[str]
     suggestedFlashcard: dict
+    keyPoints: list[str] = Field(default_factory=list)
+    sourceChunks: list[dict] = Field(default_factory=list)
 
 
 class AnnotationResponse(BaseModel):
@@ -259,6 +316,27 @@ def _to_ai_history_response(history: AIHistory) -> AIHistoryResponse:
         answer=history.answer,
         createdAt=history.created_at,
         updatedAt=history.updated_at,
+    )
+
+
+def _to_quiz_attempt_response(attempt: QuizAttempt) -> QuizAttemptResponse:
+    incorrect_question_ids: list[str] = []
+
+    try:
+        incorrect_question_ids = [
+            str(question_id)
+            for question_id in json.loads(attempt.incorrect_question_ids)
+        ]
+    except Exception:
+        incorrect_question_ids = []
+
+    return QuizAttemptResponse(
+        id=attempt.id,
+        documentId=str(attempt.document_id),
+        score=attempt.score,
+        totalQuestions=attempt.total_questions,
+        incorrectQuestionIds=incorrect_question_ids,
+        createdAt=attempt.created_at,
     )
 
 
@@ -470,6 +548,88 @@ def get_study_document(document_id: uuid.UUID, current_user: CurrentUser = Depen
         )
 
 
+@router.post("/documents/{document_id}/flashcards", response_model=FlashcardResponse, status_code=status.HTTP_201_CREATED)
+def create_document_flashcard(
+    document_id: uuid.UUID,
+    payload: CreateFlashcardRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+) -> FlashcardResponse:
+    with Session(engine) as session:
+        _get_owned_document(session, document_id, current_user)
+        flashcard = create_flashcard(
+            session=session,
+            document_id=document_id,
+            front=payload.front,
+            back=payload.back,
+        )
+        return FlashcardResponse(
+            id=flashcard.id,
+            front=flashcard.front,
+            back=flashcard.back,
+            order_index=flashcard.order_index,
+        )
+
+
+@router.get("/documents/{document_id}/quiz-attempts", response_model=list[QuizAttemptResponse])
+def get_quiz_attempts(
+    document_id: uuid.UUID,
+    current_user: CurrentUser = Depends(get_current_user),
+) -> list[QuizAttemptResponse]:
+    with Session(engine) as session:
+        _get_owned_document(session, document_id, current_user)
+        attempts = session.exec(
+            select(QuizAttempt)
+            .where(QuizAttempt.document_id == document_id)
+            .order_by(QuizAttempt.created_at.desc())
+        ).all()
+        return [_to_quiz_attempt_response(attempt) for attempt in attempts]
+
+
+@router.post("/documents/{document_id}/quiz-attempts", response_model=QuizAttemptResponse, status_code=status.HTTP_201_CREATED)
+def create_quiz_attempt(
+    document_id: uuid.UUID,
+    payload: CreateQuizAttemptRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+) -> QuizAttemptResponse:
+    with Session(engine) as session:
+        _get_owned_document(session, document_id, current_user)
+        quiz = session.exec(
+            select(Quiz).where(Quiz.document_id == document_id)
+        ).first()
+
+        if quiz is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Quiz not found.",
+            )
+
+        valid_question_ids = {
+            question.id
+            for question in session.exec(
+                select(QuizQuestion).where(QuizQuestion.quiz_id == quiz.id)
+            ).all()
+        }
+
+        if any(question_id not in valid_question_ids for question_id in payload.incorrectQuestionIds):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Quiz attempt contains invalid question IDs.",
+            )
+
+        attempt = QuizAttempt(
+            document_id=document_id,
+            score=payload.score,
+            total_questions=payload.totalQuestions,
+            incorrect_question_ids=json.dumps(
+                [str(question_id) for question_id in payload.incorrectQuestionIds]
+            ),
+        )
+        session.add(attempt)
+        session.commit()
+        session.refresh(attempt)
+        return _to_quiz_attempt_response(attempt)
+
+
 @router.get("/documents/{document_id}/chunks", response_model=list[DocumentChunkResponse])
 def get_document_chunks(document_id: uuid.UUID, current_user: CurrentUser = Depends(get_current_user)) -> list[DocumentChunkResponse]:
     with Session(engine) as session:
@@ -534,6 +694,56 @@ def explain_study_selection(payload: ExplainSelectionRequest, current_user: Curr
             example=explanation.example,
             relatedTerms=explanation.related_terms,
             suggestedFlashcard=explanation.suggested_flashcard.model_dump(),
+            keyPoints=[],
+            sourceChunks=[],
+        )
+
+
+@router.post("/documents/{document_id}/ask-ai", response_model=ExplainSelectionResponse)
+def ask_ai_about_document(
+    document_id: uuid.UUID,
+    payload: DocumentQuestionRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+) -> ExplainSelectionResponse:
+    with Session(engine) as session:
+        _get_owned_document(session, document_id, current_user)
+        chunks = session.exec(
+            select(DocumentChunk)
+            .where(DocumentChunk.document_id == document_id)
+            .order_by(DocumentChunk.order_index.asc())
+        ).all()
+
+        if not chunks:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Document chunks not found.",
+            )
+
+        try:
+            answer = answer_document_question(
+                chunks=[chunk.content for chunk in chunks],
+                user_question=payload.question,
+            )
+        except AIServiceError as exc:
+            _raise_ai_http_error(exc)
+
+        return ExplainSelectionResponse(
+            historyId=None,
+            selectedText="",
+            simplifiedExplanation=answer.answer,
+            beginnerExplanation=answer.answer,
+            example="",
+            relatedTerms=answer.related_terms,
+            suggestedFlashcard=answer.suggested_flashcard.model_dump(),
+            keyPoints=answer.key_points,
+            sourceChunks=[
+                {
+                    "chunkIndex": chunk.chunk_index,
+                    "excerpt": chunk.excerpt,
+                    "relevanceReason": chunk.relevance_reason,
+                }
+                for chunk in answer.supporting_chunks
+            ],
         )
 
 

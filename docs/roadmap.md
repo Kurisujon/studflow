@@ -150,6 +150,27 @@ Workstream constraints:
 
 Most recent implemented changes:
 
+- Grounded document-level Q&A was added through:
+  - `backend/services/ai_service.py`
+  - `backend/api/routes/documents.py`
+- Frontend document-Q&A integration was added in:
+  - `frontend/lib/api/annotations.ts`
+  - `frontend/components/study/AIStudyAssistantPanel.tsx`
+  - `frontend/components/study/StudySidePanel.tsx`
+- Quiz attempt history and weak-topic review were added through:
+  - `backend/models/tables.py`
+  - `backend/api/routes/documents.py`
+  - `backend/alembic/versions/20260614_0001_add_quiz_attempts.py`
+- Frontend quiz-attempt integration was added in:
+  - `frontend/lib/api/quiz-attempts.ts`
+  - `frontend/components/quiz-study.tsx`
+  - `frontend/components/study/StudyWorkspace.tsx`
+- Suggested AI answers can now be saved into the document flashcard set through a new backend flashcard-create path:
+  - `backend/api/routes/documents.py`
+  - `backend/services/documents.py`
+- Frontend flashcard-save integration was added in:
+  - `frontend/lib/api/flashcards.ts`
+  - `frontend/components/study/AIStudyAssistantPanel.tsx`
 - Mobile study side-panel behavior was adapted toward bottom-sheet presentation in `frontend/components/study/StudySidePanel.tsx`.
 - Annotation note markers were made keyboard-focusable in `frontend/components/study/AnnotatableTextBlock.tsx`.
 - Shared interaction helpers for pills, cards, annotation states, and mobile workspace controls were added in `frontend/app/globals.css`.
@@ -189,6 +210,15 @@ Most recent implemented changes:
 
 Behavior of those changes:
 
+- The AI panel can now answer questions about the full uploaded document even when no text is selected.
+- Document-level answers are grounded in extracted document chunks and return supporting chunk references to show where the answer came from.
+- Grounded document answers still flow through the existing AI panel and history experience instead of creating a separate chat surface.
+- Completed quiz runs are now persisted as attempt history with score, total questions, and incorrect question IDs.
+- The quiz results screen now shows recent attempts and a weak-topic review section listing the missed questions from the current run.
+- Users can now retry only the incorrect questions from the current attempt or from saved attempt history without leaving the quiz flow.
+- The AI panel now exposes a `Save as Flashcard` action using the suggested flashcard already returned by the explain-selection flow.
+- Saving a suggested flashcard appends it to the current document’s flashcard set instead of introducing a separate custom-flashcard model.
+- After saving, the study route refreshes so the flashcard becomes part of the existing flashcards tab data.
 - The study side panel now behaves more naturally on narrow screens instead of remaining a strict desktop side drawer.
 - Notes embedded in annotated text are now keyboard-accessible, not mouse-only.
 - Hover, focus, and selected states are more consistent across annotation-linked UI, quiz choices, notes, related videos, and study controls.
@@ -358,6 +388,9 @@ Latest product update completed on 2026-06-11:
 
 - first study-workspace UI refinement batch shipped in the frontend
 - second study-workspace UI refinement batch extended the shared visual system to flashcards, quiz, and AI panel
+- first post-UI product feature shipped: save AI answer as flashcard
+- second post-UI product feature shipped: quiz attempt history with weak-topic review
+- third post-UI product feature shipped: grounded document-level Q&A
 - no backend contracts changed
 - the UI checklist in `docs/tasks.md` was advanced to reflect completed items
 
@@ -365,6 +398,23 @@ Validation completed for the latest study-workspace UI batches:
 
 - `git diff --check` passed
 - frontend production build completed successfully with `npm run build`
+- backend route/service compile check passed with `python3 -m py_compile`
+
+Validation completed for the quiz-attempt feature:
+
+- `git diff --check` passed
+- backend syntax check passed with `python3 -m py_compile`
+- frontend TypeScript check passed with `tsc --noEmit`
+
+Validation note:
+
+- a full frontend production build was started and reached successful compile/TypeScript stages before being interrupted once the narrower typecheck had already passed
+
+Validation completed for the grounded document-Q&A feature:
+
+- `git diff --check` passed
+- backend syntax check passed with `python3 -m py_compile`
+- frontend TypeScript check passed with `tsc --noEmit`
 
 Validation still not fully completed:
 

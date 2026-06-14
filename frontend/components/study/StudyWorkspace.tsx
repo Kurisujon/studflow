@@ -141,7 +141,7 @@ export function StudyWorkspace({
         ) : null}
 
         {currentTab === "quiz" ? (
-          <QuizStudy questions={document.quiz} />
+          <QuizStudy documentId={document.id} questions={document.quiz} />
         ) : null}
 
         {currentTab === "summary" ? (
