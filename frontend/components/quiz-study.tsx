@@ -23,13 +23,16 @@ export function QuizStudy({
   const [activeIndex, setActiveIndex] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState<Record<number, number>>({});
   const [showScore, setShowScore] = useState(false);
-  const [quizMode, setQuizMode] = useState<"full" | "incorrect-only">("full");
+  const [retryQuestionIds, setRetryQuestionIds] = useState<string[] | null>(null);
   const [attempts, setAttempts] = useState<QuizAttemptSummary[]>([]);
   const [attemptsLoading, setAttemptsLoading] = useState(true);
   const [attemptError, setAttemptError] = useState<string | null>(null);
-  const [sessionQuestions, setSessionQuestions] = useState(questions);
   const hasCelebratedRef = useRef(false);
   const persistedAttemptRef = useRef(false);
+  const quizMode: "full" | "incorrect-only" = retryQuestionIds ? "incorrect-only" : "full";
+  const sessionQuestions = retryQuestionIds
+    ? questions.filter((currentQuestion) => retryQuestionIds.includes(currentQuestion.id))
+    : questions;
   const hasQuestions = sessionQuestions.length > 0;
   const question = hasQuestions ? sessionQuestions[activeIndex] : null;
   const selectedIndex = selectedAnswers[activeIndex];
@@ -47,15 +50,6 @@ export function QuizStudy({
       selectedAnswers[index] !== currentQuestion.correct_answer_index,
   );
   const currentIncorrectQuestionIds = incorrectQuestions.map((currentQuestion) => currentQuestion.id);
-
-  useEffect(() => {
-    setSessionQuestions(questions);
-    setActiveIndex(0);
-    setSelectedAnswers({});
-    setShowScore(false);
-    setQuizMode("full");
-    persistedAttemptRef.current = false;
-  }, [questions]);
 
   useEffect(() => {
     let mounted = true;
@@ -245,8 +239,7 @@ export function QuizStudy({
     setActiveIndex(0);
     setSelectedAnswers({});
     setShowScore(false);
-    setSessionQuestions(questions);
-    setQuizMode("full");
+    setRetryQuestionIds(null);
     hasCelebratedRef.current = false;
     persistedAttemptRef.current = false;
   }
@@ -256,10 +249,7 @@ export function QuizStudy({
       return;
     }
 
-    setSessionQuestions(
-      questions.filter((currentQuestion) => currentIncorrectQuestionIds.includes(currentQuestion.id)),
-    );
-    setQuizMode("incorrect-only");
+    setRetryQuestionIds(currentIncorrectQuestionIds);
     setActiveIndex(0);
     setSelectedAnswers({});
     setShowScore(false);
@@ -272,10 +262,7 @@ export function QuizStudy({
       return;
     }
 
-    setSessionQuestions(
-      questions.filter((currentQuestion) => attempt.incorrectQuestionIds.includes(currentQuestion.id)),
-    );
-    setQuizMode("incorrect-only");
+    setRetryQuestionIds(attempt.incorrectQuestionIds);
     setActiveIndex(0);
     setSelectedAnswers({});
     setShowScore(false);

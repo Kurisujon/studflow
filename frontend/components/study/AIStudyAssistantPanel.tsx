@@ -462,6 +462,7 @@ export function AIStudyAssistantPanel({
           }
           disabled={!hasContext || loading}
           className="study-utility-pill"
+          style={activeMode === "ask-ai" ? { color: "#ffffff" } : undefined}
         >
           Ask AI
         </Button>
@@ -510,6 +511,7 @@ export function AIStudyAssistantPanel({
         onClick={() => submit(question)}
         disabled={!hasContext || loading}
         className="study-utility-pill"
+        style={{ color: "#ffffff" }}
       >
         {loading ? "Running AI..." : "Run AI"}
       </Button>

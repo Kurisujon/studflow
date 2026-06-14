@@ -12,7 +12,6 @@ export function StudySidePanel({
   documentId,
   activeTab,
   onTabChange,
-  selectedText,
   aiContext,
   assistantInitialQuestion,
   aiMode,
@@ -34,7 +33,6 @@ export function StudySidePanel({
   documentId: string;
   activeTab: StudyBubbleTab;
   onTabChange: (tab: StudyBubbleTab) => void;
-  selectedText: string;
   aiContext: StudyAIContext;
   assistantInitialQuestion?: string;
   aiMode: AIToolMode;

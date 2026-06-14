@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 
 import { Button } from "@/components/ui/button";
@@ -26,7 +26,7 @@ export function FlashcardStudy({
     };
   }, []);
 
-  function changeCard(nextIndex: number) {
+  const changeCard = useCallback((nextIndex: number) => {
     if (nextIndex < 0 || nextIndex >= flashcards.length || isChangingCard) {
       return;
     }
@@ -47,7 +47,7 @@ export function FlashcardStudy({
       setIsChangingCard(false);
       cardChangeTimeoutRef.current = null;
     }, CARD_FLIP_DURATION_MS);
-  }
+  }, [flashcards.length, isChangingCard, isFlipped]);
 
   useEffect(() => {
     function handleFlashcardShortcuts(event: KeyboardEvent) {

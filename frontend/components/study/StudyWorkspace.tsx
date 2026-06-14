@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 import { FlashcardStudy } from "@/components/flashcard-study";
@@ -31,13 +31,13 @@ export function StudyWorkspace({
   const currentTab: StudyTab =
     initialTab === "flashcards" || initialTab === "quiz" ? initialTab : "summary";
 
-  function navigateToTab(tab: StudyTab) {
+  const navigateToTab = useCallback((tab: StudyTab) => {
     if (tab === currentTab) {
       return;
     }
 
     router.push(`/dashboard/study/${document.id}?tab=${tab}`);
-  }
+  }, [currentTab, document.id, router]);
 
   useEffect(() => {
     function handleStudyTabShortcuts(event: KeyboardEvent) {

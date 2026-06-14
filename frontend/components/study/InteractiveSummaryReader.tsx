@@ -1219,7 +1219,6 @@ export function InteractiveSummaryReader({
         documentId={documentId}
         activeTab={activeBubbleTab}
         onTabChange={setActiveBubbleTab}
-        selectedText={aiContextText || selectionState?.selectedText || pendingSelection?.selectedText || ""}
         aiContext={
           aiContext.selectedText || aiContext.noteContent
             ? aiContext
