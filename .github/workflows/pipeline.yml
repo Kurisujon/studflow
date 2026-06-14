@@ -231,9 +231,11 @@ jobs:
           remote_command="
             APP_PATH='${AZURE_VM_APP_PATH:-/home/${AZURE_VM_USER}/studflow}' &&
             TMP_DEPLOY_DIR=\$(mktemp -d) &&
+            cleanup() { rm -rf \"\$TMP_DEPLOY_DIR\"; } &&
+            trap cleanup EXIT &&
             mkdir -p \"\$APP_PATH\" &&
             tar -xzf /tmp/release.tgz -C \"\$TMP_DEPLOY_DIR\" &&
-            mv /tmp/.env.production \"\$APP_PATH/.env.production\" &&
+            cp /tmp/.env.production \"\$APP_PATH/.env.production\" &&
             GHCR_USERNAME='${GHCR_USERNAME}' GHCR_TOKEN='${GHCR_PAT}' APP_DIR=\"\$APP_PATH\" ARCHIVE_PATH=/tmp/release.tgz ENV_PATH=\"\$APP_PATH/.env.production\" bash \"\$TMP_DEPLOY_DIR/scripts/deploy.sh\" &&
             rm -rf \"\$TMP_DEPLOY_DIR\"
           "

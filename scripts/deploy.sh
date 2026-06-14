@@ -46,6 +46,17 @@ compose_build_on_server="$(
   grep -m1 '^COMPOSE_BUILD_ON_SERVER=' "$ENV_PATH" | cut -d= -f2- | tr -d '\r' | tr '[:upper:]' '[:lower:]' || true
 )"
 
+echo "Disk usage before Docker cleanup:"
+df -h
+
+# Free unused Docker artifacts before pulling new images on the VM.
+docker container prune -f || true
+docker image prune -af || true
+docker builder prune -af || true
+
+echo "Disk usage after Docker cleanup:"
+df -h
+
 if [ -n "${GHCR_USERNAME:-}" ] && [ -n "${GHCR_TOKEN:-}" ]; then
   printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
 fi
